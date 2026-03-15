@@ -311,7 +311,9 @@ app.post('/api/openclaw/chat', (req, res) => {
   };
   
   if (payload.stream) {
-    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
     res.setHeader('Transfer-Encoding', 'chunked');
     const oReq = http.request(opts, oRes => {
       oRes.on('data', chunk => res.write(chunk));
