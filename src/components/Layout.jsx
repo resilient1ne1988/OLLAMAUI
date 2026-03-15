@@ -17,9 +17,8 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const { models, selectedModel, setSelectedModel, connected, checkConnection } = useOllama()
-  const { agents, selectedAgent, setSelectedAgent, openclawConnected, onlineMode, setOnlineMode } = useOpenClaw()
+  const { agents, selectedAgent, setSelectedAgent, provider, setProvider, openclawConnected, onlineMode, setOnlineMode, checkOpenClaw } = useOpenClaw()
   const { pendingCount } = useToolApproval()
-  const [provider, setProvider] = useState('ollama') // 'ollama' | 'openclaw'
   const [collapsed, setCollapsed] = useState(false)
 
   const isElectron = typeof window !== 'undefined' && window.navigator.userAgent.includes('Electron')
@@ -76,7 +75,13 @@ export default function Layout() {
             </select>
           )}
 
-          <button className="btn-secondary btn-sm" onClick={checkConnection} title="Refresh">⟳</button>
+          <button
+            className="btn-secondary btn-sm"
+            onClick={provider === 'ollama' ? checkConnection : checkOpenClaw}
+            title="Refresh"
+          >
+            ⟳
+          </button>
         </div>
 
         <div className="topbar-right">
