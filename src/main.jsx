@@ -6,6 +6,7 @@ import { OpenClawProvider } from './context/OpenClawContext'
 import { ToolApprovalProvider } from './context/ToolApprovalContext'
 import App from './App.jsx'
 import './App.css'
+import './ApprovalPolicy.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <HashRouter>
