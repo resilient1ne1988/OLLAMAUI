@@ -5,6 +5,7 @@ const OpenClawContext = createContext(null)
 export function OpenClawProvider({ children }) {
   const [agents, setAgents] = useState([])
   const [selectedAgent, setSelectedAgent] = useState('')
+  const [provider, setProvider] = useState('ollama')
   const [openclawConnected, setOpenclawConnected] = useState(false)
   const [onlineMode, setOnlineMode] = useState(true)
 
@@ -22,9 +23,12 @@ export function OpenClawProvider({ children }) {
     fetch('/api/openclaw/agents')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d && Array.isArray(d)) {
-          setAgents(d)
-          if (d.length > 0) setSelectedAgent(prev => prev || d[0].id || d[0].name || '')
+        const list = Array.isArray(d) ? d : (Array.isArray(d?.agents) ? d.agents : [])
+        if (list.length > 0) {
+          setAgents(list)
+          setSelectedAgent(prev => prev || list[0].id || list[0].name || '')
+        } else {
+          setAgents([])
         }
       })
       .catch(() => {})
@@ -37,6 +41,8 @@ export function OpenClawProvider({ children }) {
       agents,
       selectedAgent,
       setSelectedAgent,
+      provider,
+      setProvider,
       openclawConnected,
       onlineMode,
       setOnlineMode,
