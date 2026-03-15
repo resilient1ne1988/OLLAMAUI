@@ -10,6 +10,9 @@ export default function Settings() {
     defaultPage: 'dashboard',
     shellSafety: 'approval',
     legacyShellTags: false,
+    mcpServerCommand: '',
+    mcpServerCwd: '',
+    mcpAutoStart: false,
     dataDir: '',
   })
   const [saved, setSaved] = useState(false)
@@ -18,10 +21,15 @@ export default function Settings() {
   const [testOllamaLoading, setTestOllamaLoading] = useState(false)
   const [testOpenClaw, setTestOpenClaw] = useState(null)
   const [testOpenClawLoading, setTestOpenClawLoading] = useState(false)
+  const [mcpStatus, setMcpStatus] = useState(null)
+  const [mcpLoading, setMcpLoading] = useState(false)
+  const [mcpLogs, setMcpLogs] = useState([])
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(d => setSettings(prev => ({ ...prev, ...d }))).catch(() => {})
     fetch('/api/app-info').then(r => r.json()).then(setAppInfo).catch(() => {})
+    fetch('/api/mcp/status').then(r => r.json()).then(setMcpStatus).catch(() => {})
+    fetch('/api/mcp/logs').then(r => r.json()).then(d => setMcpLogs(Array.isArray(d?.logs) ? d.logs : [])).catch(() => {})
   }, [])
 
   const save = async () => {
@@ -82,6 +90,55 @@ export default function Settings() {
   }
 
   const set = (key, val) => setSettings(prev => ({ ...prev, [key]: val }))
+
+  const refreshMcp = async () => {
+    setMcpLoading(true)
+    try {
+      const [statusRes, logsRes] = await Promise.all([
+        fetch('/api/mcp/status'),
+        fetch('/api/mcp/logs')
+      ])
+      const status = await statusRes.json()
+      const logs = await logsRes.json()
+      setMcpStatus(status)
+      setMcpLogs(Array.isArray(logs?.logs) ? logs.logs : [])
+    } catch {
+      setMcpStatus({ running: false, lastError: 'MCP server status check failed' })
+      setMcpLogs([])
+    } finally {
+      setMcpLoading(false)
+    }
+  }
+
+  const startMcp = async () => {
+    setMcpLoading(true)
+    try {
+      const res = await fetch('/api/mcp/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: settings.mcpServerCommand, cwd: settings.mcpServerCwd || undefined })
+      })
+      const d = await res.json()
+      if (!res.ok || !d.ok) {
+        alert(`Failed to start MCP server: ${d.error || res.statusText}`)
+      }
+    } catch (e) {
+      alert('Failed to start MCP server: ' + e.message)
+    } finally {
+      await refreshMcp()
+    }
+  }
+
+  const stopMcp = async () => {
+    setMcpLoading(true)
+    try {
+      await fetch('/api/mcp/stop', { method: 'POST' })
+    } catch (e) {
+      alert('Failed to stop MCP server: ' + e.message)
+    } finally {
+      await refreshMcp()
+    }
+  }
 
   return (
     <div className="page settings-page">
@@ -172,6 +229,62 @@ export default function Settings() {
               <span>Enable legacy &lt;shell&gt; tag auto-execution (not recommended)</span>
             </label>
             <div className="field-note warning-note">⚠️ Enabling this allows AI to auto-run shell commands without approval.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* MCP Server */}
+      <div className="settings-section">
+        <h2 className="settings-section-title">🧩 MCP Server</h2>
+        <div className="settings-grid">
+          <div className="form-field">
+            <label className="form-label">MCP Server Command</label>
+            <input
+              className="text-input"
+              value={settings.mcpServerCommand}
+              onChange={e => set('mcpServerCommand', e.target.value)}
+              placeholder="Example: npx -y @modelcontextprotocol/server-filesystem ."
+            />
+            <div className="field-note">Command used by the local backend to start your MCP server process.</div>
+          </div>
+          <div className="form-field">
+            <label className="form-label">MCP Working Directory (optional)</label>
+            <input
+              className="text-input"
+              value={settings.mcpServerCwd}
+              onChange={e => set('mcpServerCwd', e.target.value)}
+              placeholder="Example: C:\\Users\\you\\Documents"
+            />
+          </div>
+          <div className="form-field">
+            <label className="checkbox-label">
+              <input type="checkbox" checked={!!settings.mcpAutoStart} onChange={e => set('mcpAutoStart', e.target.checked)} />
+              <span>Auto-start MCP server when backend starts</span>
+            </label>
+          </div>
+          <div className="form-field">
+            <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+              <button className="btn-secondary btn-sm" onClick={refreshMcp} disabled={mcpLoading}>
+                {mcpLoading ? '⏳' : '🔄 Refresh'}
+              </button>
+              <button className="btn-primary btn-sm" onClick={startMcp} disabled={mcpLoading || !settings.mcpServerCommand.trim()}>
+                ▶ Start MCP
+              </button>
+              <button className="btn-ghost btn-sm" onClick={stopMcp} disabled={mcpLoading || !mcpStatus?.running}>
+                ⏹ Stop MCP
+              </button>
+              {mcpStatus && (
+                <span className={mcpStatus.running ? 'text-success' : 'text-secondary'}>
+                  {mcpStatus.running
+                    ? `✅ Running (pid ${mcpStatus.pid})`
+                    : (mcpStatus.lastError ? `❌ ${mcpStatus.lastError}` : 'Idle')}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="form-field" style={{gridColumn:'1 / -1'}}>
+            <label className="form-label">Recent MCP Logs</label>
+            <pre className="approval-pre" style={{maxHeight:'180px',overflow:'auto'}}>{mcpLogs.length ? mcpLogs.join('\n') : 'No logs yet.'}</pre>
           </div>
         </div>
       </div>
