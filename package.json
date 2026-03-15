@@ -1,7 +1,7 @@
 {
   "name": "ollamaui",
   "version": "1.0.0",
-  "description": "Local Ollama Chat UI — desktop + browser",
+  "description": "BTCMACHINE — Local Ollama Chat UI desktop + browser",
   "main": "electron-main.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"vite\"",
@@ -13,10 +13,16 @@
   },
   "build": {
     "appId": "com.ollamaui.app",
-    "productName": "Ollama UI",
-    "directories": { "output": "release" },
+    "productName": "BTCMACHINE",
+    "directories": {
+      "output": "release"
+    },
+    "publish": null,
     "win": {
-      "target": "nsis",
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "src/icon.ico"
     },
     "files": [
@@ -27,7 +33,10 @@
       "node_modules/**"
     ],
     "extraResources": [
-      { "from": "server", "to": "server" }
+      {
+        "from": "server",
+        "to": "server"
+      }
     ]
   },
   "devDependencies": {
@@ -37,6 +46,7 @@
     "electron-builder": "^24.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^7.13.1",
     "vite": "^5.0.0",
     "wait-on": "^7.0.0"
   },
