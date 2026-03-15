@@ -1,0 +1,48 @@
+{
+  "name": "ollamaui",
+  "version": "1.0.0",
+  "description": "Local Ollama Chat UI — desktop + browser",
+  "main": "electron-main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"vite\"",
+    "server": "node server/index.js",
+    "build": "vite build",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run server\" \"wait-on http://localhost:3838 && electron .\"",
+    "dist": "npm run build && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.ollamaui.app",
+    "productName": "Ollama UI",
+    "directories": { "output": "release" },
+    "win": {
+      "target": "nsis",
+      "icon": "src/icon.ico"
+    },
+    "files": [
+      "dist/**",
+      "server/**",
+      "electron-main.js",
+      "package.json",
+      "node_modules/**"
+    ],
+    "extraResources": [
+      { "from": "server", "to": "server" }
+    ]
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "concurrently": "^8.0.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "vite": "^5.0.0",
+    "wait-on": "^7.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.0",
+    "node-fetch": "^3.3.0"
+  }
+}
