@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 
 const app = express();
-const PORT = 3838;
+const PORT = Number(process.env.PORT) || 3838;
 const OLLAMA_BASE = 'http://127.0.0.1:11434';
 
 // Persistence setup
@@ -18,6 +18,92 @@ if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 const SESSIONS_FILE = path.join(DATA_DIR, 'sessions.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const HISTORY_FILE = path.join(DATA_DIR, 'history.json');
+
+// MCP server process manager
+const MCP_LOG_LIMIT = 300;
+let mcpProcess = null;
+const mcpState = {
+  running: false,
+  pid: null,
+  command: '',
+  args: [],
+  cwd: process.cwd(),
+  startedAt: null,
+  exitedAt: null,
+  exitCode: null,
+  signal: null,
+  lastError: null,
+  logs: []
+};
+
+function pushMcpLog(line) {
+  if (!line) return;
+  const entry = `[${new Date().toISOString()}] ${line}`;
+  mcpState.logs.push(entry);
+  if (mcpState.logs.length > MCP_LOG_LIMIT) {
+    mcpState.logs = mcpState.logs.slice(mcpState.logs.length - MCP_LOG_LIMIT);
+  }
+}
+
+function getMcpCommandFromSettings() {
+  const settings = readJSON(SETTINGS_FILE, {});
+  return (settings.mcpServerCommand || '').trim();
+}
+
+function startMcpServer({ command, args = [], cwd, env = {} } = {}) {
+  if (mcpProcess) throw new Error('MCP server is already running');
+
+  const resolvedCommand = (command || getMcpCommandFromSettings() || '').trim();
+  if (!resolvedCommand) throw new Error('No MCP server command configured');
+
+  const resolvedCwd = cwd ? path.resolve(cwd) : process.cwd();
+  const safeArgs = Array.isArray(args) ? args : [];
+  mcpProcess = spawn(resolvedCommand, safeArgs, {
+    cwd: resolvedCwd,
+    env: { ...process.env, ...env },
+    shell: true,
+    windowsHide: true
+  });
+
+  mcpState.running = true;
+  mcpState.pid = mcpProcess.pid;
+  mcpState.command = resolvedCommand;
+  mcpState.args = safeArgs;
+  mcpState.cwd = resolvedCwd;
+  mcpState.startedAt = Date.now();
+  mcpState.exitedAt = null;
+  mcpState.exitCode = null;
+  mcpState.signal = null;
+  mcpState.lastError = null;
+  pushMcpLog(`MCP server started: ${resolvedCommand}`);
+
+  mcpProcess.stdout.on('data', (chunk) => {
+    pushMcpLog(`stdout: ${String(chunk).trimEnd()}`);
+  });
+  mcpProcess.stderr.on('data', (chunk) => {
+    pushMcpLog(`stderr: ${String(chunk).trimEnd()}`);
+  });
+  mcpProcess.on('error', (err) => {
+    mcpState.lastError = err.message;
+    pushMcpLog(`process error: ${err.message}`);
+  });
+  mcpProcess.on('exit', (code, signal) => {
+    mcpState.running = false;
+    mcpState.exitCode = code;
+    mcpState.signal = signal;
+    mcpState.exitedAt = Date.now();
+    pushMcpLog(`MCP server exited (code=${code}, signal=${signal || 'none'})`);
+    mcpProcess = null;
+  });
+}
+
+function stopMcpServer() {
+  if (!mcpProcess) return false;
+  const pid = mcpProcess.pid;
+  mcpProcess.kill();
+  pushMcpLog(`Stop requested for MCP server pid=${pid}`);
+  return true;
+}
 
 function readJSON(file, defaultVal) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -249,6 +335,40 @@ app.post('/api/openclaw/chat', (req, res) => {
   }
 });
 
+// ─── MCP SERVER MANAGEMENT ───────────────────────────────────────────────────
+app.get('/api/mcp/status', (req, res) => {
+  res.json({
+    running: mcpState.running,
+    pid: mcpState.pid,
+    command: mcpState.command,
+    args: mcpState.args,
+    cwd: mcpState.cwd,
+    startedAt: mcpState.startedAt,
+    exitedAt: mcpState.exitedAt,
+    exitCode: mcpState.exitCode,
+    signal: mcpState.signal,
+    lastError: mcpState.lastError
+  });
+});
+
+app.get('/api/mcp/logs', (req, res) => {
+  res.json({ logs: mcpState.logs.slice(-100) });
+});
+
+app.post('/api/mcp/start', (req, res) => {
+  try {
+    startMcpServer(req.body || {});
+    res.json({ ok: true, status: { running: mcpState.running, pid: mcpState.pid, command: mcpState.command } });
+  } catch (e) {
+    res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+app.post('/api/mcp/stop', (req, res) => {
+  const stopped = stopMcpServer();
+  res.json({ ok: true, stopped });
+});
+
 // ─── PERSISTENCE ─────────────────────────────────────────────────────────────
 app.get('/api/sessions', (req, res) => res.json(readJSON(SESSIONS_FILE, [])));
 app.post('/api/sessions', (req, res) => {
@@ -290,4 +410,13 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`BTCMACHINE server v2.0 running at http://localhost:${PORT}`);
   console.log(`Data dir: ${DATA_DIR}`);
+
+  const settings = readJSON(SETTINGS_FILE, {});
+  if (settings.mcpAutoStart && settings.mcpServerCommand) {
+    try {
+      startMcpServer({ command: settings.mcpServerCommand, cwd: settings.mcpServerCwd || process.cwd() });
+    } catch (e) {
+      console.log(`MCP auto-start skipped: ${e.message}`);
+    }
+  }
 });
