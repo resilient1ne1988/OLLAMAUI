@@ -5,17 +5,118 @@ import { useToolApproval } from '../context/ToolApprovalContext'
 import { TOOL_DEFINITIONS } from '../tools/definitions'
 
 const DEFAULT_SYSTEM_PROMPT_OLLAMA =
-  'You are a helpful assistant with access to run shell commands on this Windows machine. ' +
-  'When you need to execute a command, use the run_shell tool. ' +
-  'Always explain what you are about to do before calling a tool.'
+  'You are a helpful assistant. Answer in clear plain text unless the user explicitly asks for code. ' +
+  'Refuse harmful, cheating, abusive, or clearly disallowed requests. ' +
+  'Never print raw tool JSON, XML tags, or pseudo-tool syntax in your reply.'
 
 const DEFAULT_SYSTEM_PROMPT_OPENCLAW =
   'You are a helpful assistant. Return clear, direct answers in plain text unless code is explicitly requested.'
+
+const OLLAMA_TOOL_POLICY_ENABLED =
+  'The run_shell tool is available for this turn. Use it only for benign local Windows or project tasks ' +
+  'the user clearly asked you to perform on this computer. Briefly explain the plan in plain English ' +
+  'before a tool call. Never mention the tool name, never show tool JSON, and never simulate a tool call in message text.'
+
+const OLLAMA_TOOL_POLICY_DISABLED =
+  'No tools are available for this turn. Do not mention, simulate, or format any tool calls.'
+
+const RAW_TOOL_FALLBACK =
+  'I can answer normally or request approval before running something on this PC, but I should not print raw tool commands or tool JSON in the chat.'
+
+const LOCAL_CONTEXT_RE = /\b(file|folder|directory|path|terminal|powershell|command prompt|cmd|process|service|port|environment|env|variable|registry|windows|explorer|desktop|downloads|documents|localhost|server|repo|repository|project|app|git|npm|pnpm|yarn|bun|node|python|pip|package\.json|vite|electron|log|logs)\b/i
+const ACTION_RE = /\b(run|execute|open|list|show|check|start|stop|restart|kill|create|rename|move|copy|delete|remove|search|find|fix|edit|debug|install|uninstall|build|test)\b/i
+const WINDOWS_PATH_RE = /[A-Za-z]:\\|\/api\/|[\\/][\w.-]+\.(js|jsx|ts|tsx|py|json|md|txt|log|yml|yaml|toml|ini)\b/i
+const COMMAND_HINT_RE = /(^|\n)\s*(Get-|Set-|New-|Remove-|Start-|Stop-|npm\s|node\s|python\s|py\s|git\s|cd\s|dir\s|ls\s|cat\s|type\s)/i
+const ERROR_HINT_RE = /```|traceback|exception|error:|failed|stderr|stdout|stack trace|cannot find|ENOENT|ECONN/i
 
 function parseStreamLine(line) {
   const stripped = line.startsWith('data:') ? line.slice(5).trim() : line.trim()
   if (!stripped || stripped === '[DONE]') return null
   return JSON.parse(stripped)
+}
+
+function tryParseObject(text) {
+  try {
+    const parsed = JSON.parse(text)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function unwrapSingleCodeFence(text) {
+  const match = text.trim().match(/^```(?:json|javascript|js|text)?\s*([\s\S]*?)```$/i)
+  return match ? match[1].trim() : text.trim()
+}
+
+function isRawRunShellPayload(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+  if (value.name === 'run_shell') return true
+  if (value.function?.name === 'run_shell') return true
+  return false
+}
+
+function isToolLeakText(text) {
+  const unwrapped = unwrapSingleCodeFence(text)
+  if (!unwrapped) return false
+  if (/^\s*run_shell\b/i.test(unwrapped)) return true
+  return isRawRunShellPayload(tryParseObject(unwrapped))
+}
+
+function sanitizeAssistantContent(content, toolCalls, provider) {
+  if (provider !== 'ollama' || !content || toolCalls.length > 0) return content
+
+  let next = content.replace(/```(?:json|javascript|js|text)?\s*([\s\S]*?)```/gi, (match, inner) => {
+    return isToolLeakText(inner) ? '' : match
+  })
+
+  next = next
+    .split(/\r?\n/)
+    .filter(line => !/^\s*run_shell\b/i.test(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  if (!next && isToolLeakText(content)) return RAW_TOOL_FALLBACK
+  if (isToolLeakText(next)) return RAW_TOOL_FALLBACK
+  return next
+}
+
+function shouldOfferShellTools(uiMessages) {
+  const recentUserText = uiMessages
+    .filter(m => m.role === 'user')
+    .slice(-4)
+    .map(m => m.content || '')
+    .join('\n')
+
+  if (!recentUserText.trim()) return false
+  if (WINDOWS_PATH_RE.test(recentUserText)) return true
+  if (COMMAND_HINT_RE.test(recentUserText)) return true
+  if (/on this (computer|pc|machine)|in this (project|repo|app)/i.test(recentUserText)) return true
+  if (LOCAL_CONTEXT_RE.test(recentUserText) && ACTION_RE.test(recentUserText)) return true
+  if (ERROR_HINT_RE.test(recentUserText) && ACTION_RE.test(recentUserText)) return true
+  return false
+}
+
+function normalizeToolCall(tc) {
+  const name = tc?.function?.name || tc?.name || ''
+  let args = tc?.function?.arguments ?? tc?.function?.parameters ?? tc?.arguments ?? tc?.parameters ?? {}
+
+  if (typeof args === 'string') {
+    const parsed = tryParseObject(args)
+    args = parsed || { command: args }
+  }
+
+  if (name !== 'run_shell') {
+    return { valid: false, name: name || 'unknown_tool', args: {}, output: `Blocked unsupported tool "${name || 'unknown_tool'}".` }
+  }
+
+  const command = typeof args?.command === 'string' ? args.command.trim() : ''
+  if (!command) {
+    return { valid: false, name, args: {}, output: 'Blocked malformed shell tool call with no command.' }
+  }
+
+  return { valid: true, name, args: { command } }
 }
 
 function renderMessageContent(text) {
@@ -104,8 +205,12 @@ export default function Chat() {
   }, [provider])
 
   // Convert UI messages to Ollama API format, collapsing tool results properly
-  const buildApiMessages = useCallback((uiMessages) => {
-    const apiMsgs = [{ role: 'system', content: systemPrompt }]
+  const buildApiMessages = useCallback((uiMessages, toolsEnabled) => {
+    const runtimeSystemPrompt = provider === 'ollama'
+      ? [systemPrompt, toolsEnabled ? OLLAMA_TOOL_POLICY_ENABLED : OLLAMA_TOOL_POLICY_DISABLED].join('\n\n')
+      : systemPrompt
+
+    const apiMsgs = [{ role: 'system', content: runtimeSystemPrompt }]
     for (const m of uiMessages) {
       if (m.role === 'user') {
         apiMsgs.push({ role: 'user', content: m.content })
@@ -119,10 +224,10 @@ export default function Chat() {
       // 'tool_call_ui' messages are display-only, not sent to model
     }
     return apiMsgs
-  }, [systemPrompt])
+  }, [systemPrompt, provider])
 
   // Stream one round-trip to active provider. Returns { content, toolCalls }.
-  const streamRound = useCallback(async (apiMessages) => {
+  const streamRound = useCallback(async (apiMessages, toolsEnabled) => {
     const targetModel = provider === 'openclaw' ? selectedAgent : selectedModel
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -137,7 +242,7 @@ export default function Chat() {
       : {
           model: targetModel,
           messages: apiMessages,
-          tools: TOOL_DEFINITIONS,
+          ...(toolsEnabled ? { tools: TOOL_DEFINITIONS } : {}),
           stream: true
         }
 
@@ -176,7 +281,7 @@ export default function Chat() {
           if (chunk) {
             fullContent += chunk
             // Yield content to caller via callback — we update state externally
-            streamRound._onChunk?.(fullContent)
+            streamRound._onChunk?.(sanitizeAssistantContent(fullContent, toolCalls, provider))
           }
 
           if (provider === 'ollama' && json.message?.tool_calls?.length) {
@@ -197,7 +302,7 @@ export default function Chat() {
             : (json.message?.content || json.response || '')
           if (chunk) {
             fullContent += chunk
-            streamRound._onChunk?.(fullContent)
+            streamRound._onChunk?.(sanitizeAssistantContent(fullContent, toolCalls, provider))
           }
           if (provider === 'ollama' && json.message?.tool_calls?.length) {
             toolCalls = [...toolCalls, ...json.message.tool_calls]
@@ -213,7 +318,8 @@ export default function Chat() {
 
   // Full conversation turn: stream → handle tool calls → stream again if needed
   const performChat = useCallback(async (uiMessages) => {
-    const apiMessages = buildApiMessages(uiMessages)
+    const toolsEnabled = provider === 'ollama' && shouldOfferShellTools(uiMessages)
+    const apiMessages = buildApiMessages(uiMessages, toolsEnabled)
 
     // Placeholder assistant bubble for streaming
     const assistantId = `asst-${Date.now()}`
@@ -234,19 +340,21 @@ export default function Chat() {
 
     let content, toolCalls
     try {
-      ;({ content, toolCalls } = await streamRound(apiMessages))
+      ;({ content, toolCalls } = await streamRound(apiMessages, toolsEnabled))
     } finally {
       streamRound._onChunk = null
     }
 
+    const safeContent = sanitizeAssistantContent(content, toolCalls, provider)
+
     // Finalize the assistant message (with tool_calls metadata for API continuity)
     setMessages(prev =>
-      prev.map(m => m.id === assistantId ? { ...m, content, toolCalls } : m)
+      prev.map(m => m.id === assistantId ? { ...m, content: safeContent, toolCalls } : m)
     )
 
     if (provider === 'openclaw' || toolCalls.length === 0) {
       // Normal text response — done
-      return [...uiMessages, { role: 'assistant', content, toolCalls: [], id: assistantId, timestamp: Date.now() }]
+      return [...uiMessages, { role: 'assistant', content: safeContent, toolCalls: [], id: assistantId, timestamp: Date.now() }]
     }
 
     // ── Native tool call path ────────────────────────────────────────────────
@@ -256,15 +364,39 @@ export default function Chat() {
     const toolResultMessages = []
 
     for (const tc of toolCalls) {
-      const { name, arguments: args } = tc.function
+      const normalizedCall = normalizeToolCall(tc)
       const callUiId = `tc-ui-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+
+      if (!normalizedCall.valid) {
+        setMessages(prev => [...prev, {
+          id: callUiId,
+          role: 'tool_call_ui',
+          toolName: normalizedCall.name,
+          args: normalizedCall.args,
+          status: 'done',
+          approved: false,
+          output: normalizedCall.output,
+          timestamp: Date.now()
+        }])
+
+        toolResultMessages.push({
+          id: `tool-result-${callUiId}`,
+          role: 'tool_result',
+          toolName: normalizedCall.name,
+          args: normalizedCall.args,
+          approved: false,
+          output: normalizedCall.output,
+          timestamp: Date.now()
+        })
+        continue
+      }
 
       // Show inline pending card in chat
       setMessages(prev => [...prev, {
         id: callUiId,
         role: 'tool_call_ui',
-        toolName: name,
-        args,
+        toolName: normalizedCall.name,
+        args: normalizedCall.args,
         status: 'pending',
         approved: null,
         output: null,
@@ -272,7 +404,7 @@ export default function Chat() {
       }])
 
       // Block until user approves or rejects in Approval Center
-      const { approved, output } = await requestApproval(name, args)
+      const { approved, output } = await requestApproval(normalizedCall.name, normalizedCall.args)
 
       // Update inline card
       setMessages(prev =>
@@ -282,8 +414,8 @@ export default function Chat() {
       toolResultMessages.push({
         id: `tool-result-${callUiId}`,
         role: 'tool_result',
-        toolName: name,
-        args,
+        toolName: normalizedCall.name,
+        args: normalizedCall.args,
         approved,
         output,
         timestamp: Date.now()
@@ -295,7 +427,7 @@ export default function Chat() {
 
     const updatedMessages = [
       ...uiMessages,
-      { role: 'assistant', content, toolCalls, id: assistantId, timestamp: Date.now() },
+      { role: 'assistant', content: safeContent, toolCalls, id: assistantId, timestamp: Date.now() },
       ...toolResultMessages
     ]
 

@@ -1,6 +1,13 @@
 import React, { useState } from 'react'
 import { useToolApproval } from '../context/ToolApprovalContext'
 
+const POLICY_LABELS = {
+  approval: { icon: '🔐', label: 'Require Approval', color: 'policy-approval' },
+  session:  { icon: '🔓', label: 'Allow for Session', color: 'policy-session' },
+  always:   { icon: '⚡',  label: 'Always Allow',     color: 'policy-always' },
+  deny:     { icon: '🚫',  label: 'Always Deny',      color: 'policy-deny' },
+}
+
 function formatArgs(args) {
   try {
     return JSON.stringify(args, null, 2)
@@ -13,29 +20,36 @@ function formatTime(ts) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-function CallCard({ call, onApprove, onReject }) {
+function CallCard({ call, onApprove, onReject, isSessionPolicy }) {
   const isPending = call.status === 'pending'
   const isRunning = call.status === 'running'
   const isApproved = call.status === 'approved'
   const isRejected = call.status === 'rejected'
 
   return (
-    <div className={`approval-card ${isPending || isRunning ? 'approval-pending' : isApproved ? 'approval-approved' : 'approval-rejected'}`}>
+    <div className={`approval-card ${
+      isPending || isRunning ? 'approval-pending'
+      : isApproved ? 'approval-approved'
+      : 'approval-rejected'
+    }`}>
       <div className="approval-card-header">
         <div className="approval-card-left">
           <span className="approval-tool-name">
             {isPending && '⏳ '}
             {isRunning && '⚙️ '}
-            {isApproved && '✅ '}
+            {isApproved && (call.sessionAuto ? '🔓 ' : '✅ ')}
             {isRejected && '🚫 '}
             <code>{call.name}()</code>
           </span>
           <span className="approval-card-time">{formatTime(call.timestamp)}</span>
+          {call.sessionAuto && (
+            <span className="approval-session-badge">session auto</span>
+          )}
         </div>
         {isPending && (
           <div className="approval-card-actions">
             <button className="btn-approve" onClick={() => onApprove(call.id)}>
-              ✅ Approve & Run
+              {isSessionPolicy ? '🔓 Approve & Allow Session' : '✅ Approve & Run'}
             </button>
             <button className="btn-reject" onClick={() => onReject(call.id)}>
               🚫 Reject
@@ -46,10 +60,12 @@ function CallCard({ call, onApprove, onReject }) {
           <span className="approval-running-label">Running…</span>
         )}
         {isApproved && (
-          <span className="approval-status-label approval-ok">Executed (exit {call.exitCode ?? '?'})</span>
+          <span className="approval-status-label approval-ok">
+            {call.sessionAuto ? 'Auto-executed (session)' : `Executed (exit ${call.exitCode ?? '?'})`}
+          </span>
         )}
         {isRejected && (
-          <span className="approval-status-label approval-no">Rejected by user</span>
+          <span className="approval-status-label approval-no">Rejected</span>
         )}
       </div>
 
@@ -71,8 +87,11 @@ function CallCard({ call, onApprove, onReject }) {
 }
 
 export default function ApprovalCenter() {
-  const { calls, approve, reject, clearHistory } = useToolApproval()
+  const { calls, approve, reject, clearHistory, policy, sessionAllowed, clearSessionAllowlist } = useToolApproval()
   const [filter, setFilter] = useState('all') // 'all' | 'pending' | 'history'
+
+  const policyMeta = POLICY_LABELS[policy] || POLICY_LABELS.approval
+  const isSessionPolicy = policy === 'session'
 
   const pending = calls.filter(c => c.status === 'pending' || c.status === 'running')
   const history = calls.filter(c => c.status === 'approved' || c.status === 'rejected')
@@ -87,7 +106,7 @@ export default function ApprovalCenter() {
         <div className="approval-title-row">
           <h2 className="approval-title">🔐 Tool Approval Center</h2>
           <p className="approval-subtitle">
-            Ollama's native tool calling sends structured function calls here before any command runs on your machine.
+            Ollama’s native tool calling sends structured function calls here before any command runs on your machine.
           </p>
         </div>
         <div className="approval-header-actions">
@@ -98,6 +117,49 @@ export default function ApprovalCenter() {
           )}
         </div>
       </div>
+
+      {/* Policy banner */}
+      <div className={`approval-policy-banner ${policyMeta.color}`}>
+        <span className="approval-policy-icon">{policyMeta.icon}</span>
+        <span className="approval-policy-label">
+          Shell Safety: <strong>{policyMeta.label}</strong>
+        </span>
+        {policy === 'always' && (
+          <span className="approval-policy-note">
+            ⚠️ All tool calls execute automatically without user review.
+          </span>
+        )}
+        {policy === 'deny' && (
+          <span className="approval-policy-note">
+            All tool calls are blocked. Change in Settings to allow execution.
+          </span>
+        )}
+        {policy === 'session' && sessionAllowed.size > 0 && (
+          <span className="approval-policy-note">
+            {sessionAllowed.size} tool{sessionAllowed.size !== 1 ? 's' : ''} approved for this session.
+          </span>
+        )}
+        <a href="#/settings" className="approval-policy-link">Change in Settings →</a>
+      </div>
+
+      {/* Session allowlist */}
+      {isSessionPolicy && sessionAllowed.size > 0 && (
+        <div className="approval-session-allowlist">
+          <div className="approval-section-label">
+            Session Allowlist
+            <button className="btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={clearSessionAllowlist}>
+              ❌ Clear All
+            </button>
+          </div>
+          <div className="approval-session-chips">
+            {[...sessionAllowed].map(toolName => (
+              <span key={toolName} className="approval-session-chip">
+                🔓 {toolName}()
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Stats strip */}
       <div className="approval-stats">
@@ -143,6 +205,7 @@ export default function ApprovalCenter() {
             call={call}
             onApprove={approve}
             onReject={reject}
+            isSessionPolicy={isSessionPolicy}
           />
         ))}
       </div>

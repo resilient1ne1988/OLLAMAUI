@@ -119,12 +119,12 @@ app.use(express.json({ limit: '10mb' }));
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 
-// ─── HEALTH ───────────────────────────────────────────────────────────────────
+// ─── HEALTH ───────────────────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', ollama: OLLAMA_BASE, uptime: process.uptime(), version: '2.0.0' });
 });
 
-// ─── OLLAMA PROXY HELPERS ─────────────────────────────────────────────────────
+// ─── OLLAMA PROXY HELPERS ───────────────────────────────────────────────────────────
 function ollamaGet(path, res) {
   http.get(`${OLLAMA_BASE}${path}`, (oRes) => {
     let data = '';
@@ -153,7 +153,7 @@ function ollamaStream(endpoint, body, res) {
   req.end();
 }
 
-// ─── OLLAMA ENDPOINTS ─────────────────────────────────────────────────────────
+// ─── OLLAMA ENDPOINTS ─────────────────────────────────────────────────────────────────────
 app.get('/api/models', (req, res) => ollamaGet('/api/tags', res));
 app.get('/api/ps', (req, res) => ollamaGet('/api/ps', res));
 app.get('/api/ollama-version', (req, res) => ollamaGet('/api/version', res));
@@ -240,10 +240,22 @@ app.post('/api/copy', (req, res) => {
   oReq.end();
 });
 
-// ─── SHELL EXECUTION ─────────────────────────────────────────────────────────
+// ─── SHELL EXECUTION ────────────────────────────────────────────────────────────────────────
 app.post('/api/shell', (req, res) => {
   const { command } = req.body;
   if (!command) return res.status(400).json({ error: 'No command provided' });
+
+  // Enforce server-side shell safety policy (defense-in-depth alongside client approval)
+  const settings = readJSON(SETTINGS_FILE, {});
+  const policy = settings.shellSafety || 'approval';
+  if (policy === 'deny') {
+    return res.status(403).json({
+      error: 'Shell execution is blocked by Shell Safety policy.',
+      detail: 'Current policy is \'deny\'. Go to Settings → Shell Safety to change it.',
+      policy
+    });
+  }
+
   const start = Date.now();
   exec(command, { shell: 'powershell.exe', timeout: 30000, maxBuffer: 2 * 1024 * 1024 }, (err, stdout, stderr) => {
     const entry = { command, stdout: stdout || '', stderr: stderr || '', exitCode: err ? (err.code || 1) : 0, duration: Date.now() - start, timestamp: Date.now() };
@@ -259,7 +271,7 @@ app.get('/api/shell-history', (req, res) => {
   res.json(readJSON(HISTORY_FILE, []));
 });
 
-// ─── OPENCLAW PROXY ──────────────────────────────────────────────────────────
+// ─── OPENCLAW PROXY ─────────────────────────────────────────────────────────────────────────────
 const OPENCLAW_AGENTS = [
   { id: 'main', name: 'main', description: 'General purpose agent' },
   { id: 'btc-chief', name: 'btc-chief', description: 'BTC Chief Decision Agent' },
@@ -371,7 +383,7 @@ app.post('/api/mcp/stop', (req, res) => {
   res.json({ ok: true, stopped });
 });
 
-// ─── PERSISTENCE ─────────────────────────────────────────────────────────────
+// ─── PERSISTENCE ─────────────────────────────────────────────────────────────────────────────
 app.get('/api/sessions', (req, res) => res.json(readJSON(SESSIONS_FILE, [])));
 app.post('/api/sessions', (req, res) => {
   const sessions = readJSON(SESSIONS_FILE, []);
@@ -404,7 +416,7 @@ app.get('/api/app-info', (req, res) => {
   });
 });
 
-// ─── SPA FALLBACK ────────────────────────────────────────────────────────────
+// ─── SPA FALLBACK ─────────────────────────────────────────────────────────────────────────────
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });

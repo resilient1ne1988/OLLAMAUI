@@ -1,0 +1,77 @@
+# App.css additions needed for approval-center policy styles
+
+Add the following CSS blocks to `src/App.css` **after** the existing `.btn-sm` rule to support the policy banner and session allowlist UI added in this commit:
+
+```css
+/* ============================
+   Approval Center — policy banner
+   ============================ */
+.approval-policy-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  flex-wrap: wrap;
+  border: 1px solid transparent;
+}
+
+.policy-approval { background: #161b22; border-color: #30363d; color: #8b949e; }
+.policy-session  { background: #0e2030; border-color: #1c4f82; color: #79c0ff; }
+.policy-always   { background: #271a04; border-color: #5a3e00; color: #e3b341; }
+.policy-deny     { background: #1f0a0a; border-color: #6e1a1a; color: #f85149; }
+
+.approval-policy-icon { font-size: 16px; }
+.approval-policy-label { font-weight: 500; }
+.approval-policy-note  { opacity: 0.85; }
+.approval-policy-link  {
+  margin-left: auto;
+  color: #58a6ff;
+  text-decoration: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.approval-policy-link:hover { text-decoration: underline; }
+
+/* ============================
+   Approval Center — session allowlist
+   ============================ */
+.approval-session-allowlist {
+  background: #0e2030;
+  border: 1px solid #1c4f82;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+}
+
+.approval-session-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.approval-session-chip {
+  background: #162638;
+  border: 1px solid #1c4f82;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: #79c0ff;
+  font-family: 'Cascadia Code', monospace;
+}
+
+.approval-session-badge {
+  background: #162638;
+  border: 1px solid #1c4f82;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  color: #79c0ff;
+  margin-left: 6px;
+}
+```
+
+These additions are isolated to `.approval-policy-*`, `.policy-*`, `.approval-session-*` namespaces and do not touch any existing rules.
