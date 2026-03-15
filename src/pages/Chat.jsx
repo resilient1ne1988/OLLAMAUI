@@ -1,12 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useOllama } from '../context/OllamaContext'
+import { useOpenClaw } from '../context/OpenClawContext'
 import { useToolApproval } from '../context/ToolApprovalContext'
 import { TOOL_DEFINITIONS } from '../tools/definitions'
 
-const DEFAULT_SYSTEM_PROMPT =
+const DEFAULT_SYSTEM_PROMPT_OLLAMA =
   'You are a helpful assistant with access to run shell commands on this Windows machine. ' +
   'When you need to execute a command, use the run_shell tool. ' +
   'Always explain what you are about to do before calling a tool.'
+
+const DEFAULT_SYSTEM_PROMPT_OPENCLAW =
+  'You are a helpful assistant. Return clear, direct answers in plain text unless code is explicitly requested.'
+
+function parseStreamLine(line) {
+  const stripped = line.startsWith('data:') ? line.slice(5).trim() : line.trim()
+  if (!stripped || stripped === '[DONE]') return null
+  return JSON.parse(stripped)
+}
 
 function renderMessageContent(text) {
   if (!text) return null
@@ -67,13 +77,14 @@ function ToolCallBubble({ msg }) {
 
 export default function Chat() {
   const { selectedModel } = useOllama()
+  const { provider, selectedAgent } = useOpenClaw()
   const { requestApproval } = useToolApproval()
 
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [isAwaitingApproval, setIsAwaitingApproval] = useState(false)
-  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT)
+  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT_OLLAMA)
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
 
   const messagesEndRef = useRef(null)
@@ -83,6 +94,14 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    setSystemPrompt(prev => {
+      if (provider === 'openclaw' && prev === DEFAULT_SYSTEM_PROMPT_OLLAMA) return DEFAULT_SYSTEM_PROMPT_OPENCLAW
+      if (provider === 'ollama' && prev === DEFAULT_SYSTEM_PROMPT_OPENCLAW) return DEFAULT_SYSTEM_PROMPT_OLLAMA
+      return prev
+    })
+  }, [provider])
 
   // Convert UI messages to Ollama API format, collapsing tool results properly
   const buildApiMessages = useCallback((uiMessages) => {
@@ -102,24 +121,35 @@ export default function Chat() {
     return apiMsgs
   }, [systemPrompt])
 
-  // Stream one round-trip to Ollama. Returns { content, toolCalls }.
+  // Stream one round-trip to active provider. Returns { content, toolCalls }.
   const streamRound = useCallback(async (apiMessages) => {
+    const targetModel = provider === 'openclaw' ? selectedAgent : selectedModel
     const controller = new AbortController()
     abortControllerRef.current = controller
 
-    const res = await fetch('/api/chat', {
+    const endpoint = provider === 'openclaw' ? '/api/openclaw/chat' : '/api/chat'
+    const payload = provider === 'openclaw'
+      ? {
+          agentId: targetModel,
+          messages: apiMessages,
+          stream: true
+        }
+      : {
+          model: targetModel,
+          messages: apiMessages,
+          tools: TOOL_DEFINITIONS,
+          stream: true
+        }
+
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: selectedModel,
-        messages: apiMessages,
-        tools: TOOL_DEFINITIONS,
-        stream: true
-      }),
+      body: JSON.stringify(payload),
       signal: controller.signal
     })
 
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.body) throw new Error('No response body from provider')
 
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
@@ -135,16 +165,21 @@ export default function Chat() {
       buffer = lines.pop()
 
       for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed) continue
         try {
-          const json = JSON.parse(trimmed)
-          if (json.message?.content) {
-            fullContent += json.message.content
+          const json = parseStreamLine(line)
+          if (!json) continue
+
+          const chunk = provider === 'openclaw'
+            ? (json.choices?.[0]?.delta?.content || json.choices?.[0]?.message?.content || '')
+            : (json.message?.content || json.response || '')
+
+          if (chunk) {
+            fullContent += chunk
             // Yield content to caller via callback — we update state externally
             streamRound._onChunk?.(fullContent)
           }
-          if (json.message?.tool_calls?.length) {
+
+          if (provider === 'ollama' && json.message?.tool_calls?.length) {
             toolCalls = [...toolCalls, ...json.message.tool_calls]
           }
         } catch {
@@ -153,8 +188,28 @@ export default function Chat() {
       }
     }
 
+    if (buffer.trim()) {
+      try {
+        const json = parseStreamLine(buffer)
+        if (json) {
+          const chunk = provider === 'openclaw'
+            ? (json.choices?.[0]?.delta?.content || json.choices?.[0]?.message?.content || '')
+            : (json.message?.content || json.response || '')
+          if (chunk) {
+            fullContent += chunk
+            streamRound._onChunk?.(fullContent)
+          }
+          if (provider === 'ollama' && json.message?.tool_calls?.length) {
+            toolCalls = [...toolCalls, ...json.message.tool_calls]
+          }
+        }
+      } catch {
+        // ignore trailing partial buffer
+      }
+    }
+
     return { content: fullContent, toolCalls }
-  }, [selectedModel])
+  }, [provider, selectedAgent, selectedModel])
 
   // Full conversation turn: stream → handle tool calls → stream again if needed
   const performChat = useCallback(async (uiMessages) => {
@@ -189,7 +244,7 @@ export default function Chat() {
       prev.map(m => m.id === assistantId ? { ...m, content, toolCalls } : m)
     )
 
-    if (toolCalls.length === 0) {
+    if (provider === 'openclaw' || toolCalls.length === 0) {
       // Normal text response — done
       return [...uiMessages, { role: 'assistant', content, toolCalls: [], id: assistantId, timestamp: Date.now() }]
     }
@@ -246,11 +301,12 @@ export default function Chat() {
 
     // Recurse: send tool results back to model for final response
     return performChat(updatedMessages)
-  }, [buildApiMessages, streamRound, requestApproval])
+  }, [buildApiMessages, streamRound, requestApproval, provider])
 
   const sendMessage = useCallback(async () => {
     const text = input.trim()
-    if (!text || isStreaming || isAwaitingApproval || !selectedModel) return
+    const targetModel = provider === 'openclaw' ? selectedAgent : selectedModel
+    if (!text || isStreaming || isAwaitingApproval || !targetModel) return
 
     const userMsg = { role: 'user', content: text, timestamp: Date.now() }
     const nextMessages = [...messages, userMsg]
@@ -279,7 +335,7 @@ export default function Chat() {
       setIsStreaming(false)
       setIsAwaitingApproval(false)
     }
-  }, [input, isStreaming, isAwaitingApproval, selectedModel, messages, performChat])
+  }, [input, isStreaming, isAwaitingApproval, selectedModel, selectedAgent, provider, messages, performChat])
 
   const stopStreaming = () => {
     abortControllerRef.current?.abort()
@@ -297,6 +353,8 @@ export default function Chat() {
   const clearChat = () => setMessages([])
 
   const isBusy = isStreaming || isAwaitingApproval
+  const targetModel = provider === 'openclaw' ? selectedAgent : selectedModel
+  const showToolUi = provider === 'ollama'
 
   return (
     <div className="chat-container">
@@ -308,7 +366,7 @@ export default function Chat() {
         <button className="btn-ghost btn-sm" onClick={clearChat} title="Clear chat history">
           🗑 Clear
         </button>
-        {isAwaitingApproval && (
+        {showToolUi && isAwaitingApproval && (
           <span className="awaiting-label">⏳ Waiting for tool approval…</span>
         )}
       </div>
@@ -332,13 +390,15 @@ export default function Chat() {
             <div className="empty-icon">🦙</div>
             <div className="empty-title">Start a conversation</div>
             <div className="empty-sub">
-              Tool calls will appear in the <strong>Approval Center</strong> before any command runs.
+              {showToolUi
+                ? 'Tool calls will appear in the Approval Center before any command runs.'
+                : 'OpenClaw responses stream directly from your selected agent.'}
             </div>
           </div>
         )}
 
         {messages.map((msg, idx) => {
-          if (msg.role === 'tool_call_ui') {
+          if (showToolUi && msg.role === 'tool_call_ui') {
             return (
               <div key={msg.id || idx} className="message-row message-tool">
                 <ToolCallBubble msg={msg} />
@@ -379,12 +439,12 @@ export default function Chat() {
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={
-            !selectedModel ? 'Select a model to start chatting…' :
-            isAwaitingApproval ? 'Waiting for tool approval in Approval Center…' :
+            !targetModel ? 'Select a model/agent to start chatting…' :
+            (showToolUi && isAwaitingApproval) ? 'Waiting for tool approval in Approval Center…' :
             isStreaming ? 'Waiting for response…' :
             'Type a message… (Enter to send, Shift+Enter for newline)'
           }
-          disabled={isBusy || !selectedModel}
+          disabled={isBusy || !targetModel}
           rows={3}
         />
         <div className="input-actions">
@@ -394,7 +454,7 @@ export default function Chat() {
             <button
               className="btn-primary"
               onClick={sendMessage}
-              disabled={!input.trim() || !selectedModel}
+              disabled={!input.trim() || !targetModel}
             >
               Send ➤
             </button>
