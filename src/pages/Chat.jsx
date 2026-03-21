@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useOllama } from '../context/OllamaContext'
 import { useOpenClaw } from '../context/OpenClawContext'
 import { useToolApproval } from '../context/ToolApprovalContext'
+import { useChatHistory } from '../context/ChatHistoryContext'
 import { TOOL_DEFINITIONS } from '../tools/definitions'
 
 const DEFAULT_SYSTEM_PROMPT_OLLAMA =
@@ -159,12 +160,12 @@ function ToolCallBubble({ msg }) {
   return (
     <div className={`tool-call-bubble ${isPending ? 'tool-pending' : isApproved ? 'tool-approved' : 'tool-rejected'}`}>
       <div className="tool-call-header">
-        {isPending && <span className="tool-spinner">⏳</span>}
-        {isApproved && <span>✅</span>}
-        {isRejected && <span>🚫</span>}
+        {isPending && <span className="tool-spinner">&#x23F3;</span>}
+        {isApproved && <span>&#x2705;</span>}
+        {isRejected && <span>&#x1F6AB;</span>}
         <span className="tool-call-name">{msg.toolName}()</span>
         <span className="tool-call-status">
-          {isPending ? 'Awaiting approval in Approval Center…' :
+          {isPending ? 'Awaiting approval in Approval Center&#x2026;' :
            isApproved ? 'Executed' : 'Rejected'}
         </span>
       </div>
@@ -176,21 +177,57 @@ function ToolCallBubble({ msg }) {
   )
 }
 
-export default function Chat() {
-  const { selectedModel } = useOllama()
-  const { provider, selectedAgent } = useOpenClaw()
-  const { requestApproval } = useToolApproval()
+/** Derive a human-readable session title from messages */
+function deriveTitle(msgs) {
+  const userMsgs = msgs.filter(m => m.role === 'user' && m.content?.trim())
+  if (!userMsgs.length) return 'Untitled Chat'
+  const last = userMsgs[userMsgs.length - 1].content.trim()
+  return last.length > 72 ? last.slice(0, 69) + '...' : last
+}
 
+function formatDate(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const now = new Date()
+  const diffMs = now - d
+  const diffDays = Math.floor(diffMs / 86400000)
+  if (diffDays === 0) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: 'short' })
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
+}
+
+/** Group sessions by model name */
+function groupByModel(sessions) {
+  const groups = {}
+  for (const s of sessions) {
+    const key = s.model || 'Unknown Model'
+    if (!groups[key]) groups[key] = []
+    groups[key].push(s)
+  }
+  return groups
+}
+
+export default function Chat() {
+  const { selectedModel, setSelectedModel, models } = useOllama()
+  const { provider, selectedAgent, setSelectedAgent, setProvider } = useOpenClaw()
+  const { requestApproval } = useToolApproval()
+  const { sessions, loaded, loadSessions, saveSession, deleteSession } = useChatHistory()
+
+  const [activeTab, setActiveTab] = useState('chat') // 'chat' | 'history'
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
   const [isAwaitingApproval, setIsAwaitingApproval] = useState(false)
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT_OLLAMA)
   const [showSystemPrompt, setShowSystemPrompt] = useState(false)
+  const [sessionId, setSessionId] = useState(() => `session-${Date.now()}`)
+  const [expandedModels, setExpandedModels] = useState({})
 
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
   const abortControllerRef = useRef(null)
+  const saveTimeoutRef = useRef(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -204,7 +241,45 @@ export default function Chat() {
     })
   }, [provider])
 
-  // Convert UI messages to Ollama API format, collapsing tool results properly
+  // Load history when History tab is opened
+  useEffect(() => {
+    if (activeTab === 'history' && !loaded) {
+      loadSessions()
+    }
+  }, [activeTab, loaded, loadSessions])
+
+  // Expand all model groups initially when sessions load
+  useEffect(() => {
+    if (loaded && sessions.length > 0) {
+      const groups = groupByModel(sessions)
+      setExpandedModels(prev => {
+        const next = { ...prev }
+        Object.keys(groups).forEach(k => { if (!(k in next)) next[k] = true })
+        return next
+      })
+    }
+  }, [loaded, sessions])
+
+  // Auto-save session after a completed turn
+  const persistSession = useCallback((msgs, sysPr, prov, mod) => {
+    if (!msgs.length) return
+    const userMsgs = msgs.filter(m => m.role === 'user')
+    if (!userMsgs.length) return
+    const title = deriveTitle(msgs)
+    const sessionData = {
+      id: sessionId,
+      title,
+      model: mod,
+      provider: prov,
+      messages: msgs,
+      systemPrompt: sysPr,
+      createdAt: msgs[0]?.timestamp || Date.now(),
+      updatedAt: Date.now()
+    }
+    clearTimeout(saveTimeoutRef.current)
+    saveTimeoutRef.current = setTimeout(() => saveSession(sessionData), 500)
+  }, [sessionId, saveSession])
+
   const buildApiMessages = useCallback((uiMessages, toolsEnabled) => {
     const runtimeSystemPrompt = provider === 'ollama'
       ? [systemPrompt, toolsEnabled ? OLLAMA_TOOL_POLICY_ENABLED : OLLAMA_TOOL_POLICY_DISABLED].join('\n\n')
@@ -221,12 +296,10 @@ export default function Chat() {
       } else if (m.role === 'tool_result') {
         apiMsgs.push({ role: 'tool', content: m.output })
       }
-      // 'tool_call_ui' messages are display-only, not sent to model
     }
     return apiMsgs
   }, [systemPrompt, provider])
 
-  // Stream one round-trip to active provider. Returns { content, toolCalls }.
   const streamRound = useCallback(async (apiMessages, toolsEnabled) => {
     const targetModel = provider === 'openclaw' ? selectedAgent : selectedModel
     const controller = new AbortController()
@@ -234,11 +307,7 @@ export default function Chat() {
 
     const endpoint = provider === 'openclaw' ? '/api/openclaw/chat' : '/api/chat'
     const payload = provider === 'openclaw'
-      ? {
-          agentId: targetModel,
-          messages: apiMessages,
-          stream: true
-        }
+      ? { agentId: targetModel, messages: apiMessages, stream: true }
       : {
           model: targetModel,
           messages: apiMessages,
@@ -280,7 +349,6 @@ export default function Chat() {
 
           if (chunk) {
             fullContent += chunk
-            // Yield content to caller via callback — we update state externally
             streamRound._onChunk?.(sanitizeAssistantContent(fullContent, toolCalls, provider))
           }
 
@@ -308,20 +376,16 @@ export default function Chat() {
             toolCalls = [...toolCalls, ...json.message.tool_calls]
           }
         }
-      } catch {
-        // ignore trailing partial buffer
-      }
+      } catch {}
     }
 
     return { content: fullContent, toolCalls }
   }, [provider, selectedAgent, selectedModel])
 
-  // Full conversation turn: stream → handle tool calls → stream again if needed
   const performChat = useCallback(async (uiMessages) => {
     const toolsEnabled = provider === 'ollama' && shouldOfferShellTools(uiMessages)
     const apiMessages = buildApiMessages(uiMessages, toolsEnabled)
 
-    // Placeholder assistant bubble for streaming
     const assistantId = `asst-${Date.now()}`
     setMessages(prev => [...prev, {
       id: assistantId,
@@ -331,7 +395,6 @@ export default function Chat() {
       timestamp: Date.now()
     }])
 
-    // Wire streaming chunks to update the assistant bubble
     streamRound._onChunk = (fullContent) => {
       setMessages(prev =>
         prev.map(m => m.id === assistantId ? { ...m, content: fullContent } : m)
@@ -347,17 +410,17 @@ export default function Chat() {
 
     const safeContent = sanitizeAssistantContent(content, toolCalls, provider)
 
-    // Finalize the assistant message (with tool_calls metadata for API continuity)
     setMessages(prev =>
       prev.map(m => m.id === assistantId ? { ...m, content: safeContent, toolCalls } : m)
     )
 
     if (provider === 'openclaw' || toolCalls.length === 0) {
-      // Normal text response — done
-      return [...uiMessages, { role: 'assistant', content: safeContent, toolCalls: [], id: assistantId, timestamp: Date.now() }]
+      const finalMsgs = [...uiMessages, { role: 'assistant', content: safeContent, toolCalls: [], id: assistantId, timestamp: Date.now() }]
+      const currentModel = provider === 'openclaw' ? selectedAgent : selectedModel
+      persistSession(finalMsgs, systemPrompt, provider, currentModel)
+      return finalMsgs
     }
 
-    // ── Native tool call path ────────────────────────────────────────────────
     setIsStreaming(false)
     setIsAwaitingApproval(true)
 
@@ -391,7 +454,6 @@ export default function Chat() {
         continue
       }
 
-      // Show inline pending card in chat
       setMessages(prev => [...prev, {
         id: callUiId,
         role: 'tool_call_ui',
@@ -403,10 +465,8 @@ export default function Chat() {
         timestamp: Date.now()
       }])
 
-      // Block until user approves or rejects in Approval Center
       const { approved, output } = await requestApproval(normalizedCall.name, normalizedCall.args)
 
-      // Update inline card
       setMessages(prev =>
         prev.map(m => m.id === callUiId ? { ...m, status: 'done', approved, output } : m)
       )
@@ -431,9 +491,8 @@ export default function Chat() {
       ...toolResultMessages
     ]
 
-    // Recurse: send tool results back to model for final response
     return performChat(updatedMessages)
-  }, [buildApiMessages, streamRound, requestApproval, provider])
+  }, [buildApiMessages, streamRound, requestApproval, provider, selectedAgent, selectedModel, systemPrompt, persistSession])
 
   const sendMessage = useCallback(async () => {
     const text = input.trim()
@@ -456,7 +515,7 @@ export default function Chat() {
           if (updated[lastIdx]?.role === 'assistant') {
             updated[lastIdx] = {
               ...updated[lastIdx],
-              content: updated[lastIdx].content || `❌ Error: ${e.message}`,
+              content: updated[lastIdx].content || `Error: ${e.message}`,
               error: true
             }
           }
@@ -482,117 +541,238 @@ export default function Chat() {
     }
   }
 
-  const clearChat = () => setMessages([])
+  const startNewChat = () => {
+    setMessages([])
+    setInput('')
+    setSessionId(`session-${Date.now()}`)
+    setActiveTab('chat')
+    inputRef.current?.focus()
+  }
+
+  const loadSessionIntoChat = (session) => {
+    setMessages(session.messages || [])
+    setSystemPrompt(session.systemPrompt || DEFAULT_SYSTEM_PROMPT_OLLAMA)
+    setSessionId(session.id)
+
+    if (session.provider === 'openclaw') {
+      setProvider('openclaw')
+      if (session.model) setSelectedAgent(session.model)
+    } else {
+      setProvider('ollama')
+      if (session.model) setSelectedModel(session.model)
+    }
+
+    setActiveTab('chat')
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
+  }
+
+  const handleDeleteSession = async (e, id) => {
+    e.stopPropagation()
+    await deleteSession(id)
+  }
+
+  const toggleModelGroup = (modelKey) => {
+    setExpandedModels(prev => ({ ...prev, [modelKey]: !prev[modelKey] }))
+  }
 
   const isBusy = isStreaming || isAwaitingApproval
   const targetModel = provider === 'openclaw' ? selectedAgent : selectedModel
   const showToolUi = provider === 'ollama'
+  const grouped = groupByModel(sessions)
+  const modelKeys = Object.keys(grouped).sort()
 
   return (
-    <div className="chat-container">
-      {/* System prompt bar */}
-      <div className="system-prompt-bar">
-        <button className="btn-ghost btn-sm" onClick={() => setShowSystemPrompt(p => !p)}>
-          {showSystemPrompt ? '▲' : '▼'} System Prompt
+    <div className="chat-page">
+      {/* Tab bar */}
+      <div className="chat-tabs">
+        <button
+          className={`chat-tab ${activeTab === 'chat' ? 'chat-tab-active' : ''}`}
+          onClick={() => setActiveTab('chat')}
+        >
+          &#x1F4AC; Chat
         </button>
-        <button className="btn-ghost btn-sm" onClick={clearChat} title="Clear chat history">
-          🗑 Clear
+        <button
+          className={`chat-tab ${activeTab === 'history' ? 'chat-tab-active' : ''}`}
+          onClick={() => { setActiveTab('history'); if (!loaded) loadSessions() }}
+        >
+          &#x1F4CB; History {sessions.length > 0 && <span className="history-badge">{sessions.length}</span>}
         </button>
-        {showToolUi && isAwaitingApproval && (
-          <span className="awaiting-label">⏳ Waiting for tool approval…</span>
-        )}
+        <button className="chat-tab-new-btn" onClick={startNewChat} title="Start a new chat">
+          &#x2795; New Chat
+        </button>
       </div>
 
-      {showSystemPrompt && (
-        <div className="system-prompt-editor">
-          <textarea
-            className="system-prompt-input"
-            value={systemPrompt}
-            onChange={e => setSystemPrompt(e.target.value)}
-            rows={3}
-            placeholder="System prompt…"
-          />
+      {/* ── CHAT TAB ── */}
+      {activeTab === 'chat' && (
+        <div className="chat-container">
+          <div className="system-prompt-bar">
+            <button className="btn-ghost btn-sm" onClick={() => setShowSystemPrompt(p => !p)}>
+              {showSystemPrompt ? '&#x25B2;' : '&#x25BC;'} System Prompt
+            </button>
+            <button className="btn-ghost btn-sm" onClick={startNewChat} title="Clear chat and start fresh">
+              &#x1F5D1; Clear
+            </button>
+            {showToolUi && isAwaitingApproval && (
+              <span className="awaiting-label">&#x23F3; Waiting for tool approval&#x2026;</span>
+            )}
+          </div>
+
+          {showSystemPrompt && (
+            <div className="system-prompt-editor">
+              <textarea
+                className="system-prompt-input"
+                value={systemPrompt}
+                onChange={e => setSystemPrompt(e.target.value)}
+                rows={3}
+                placeholder="System prompt&#x2026;"
+              />
+            </div>
+          )}
+
+          <div className="messages">
+            {messages.length === 0 && (
+              <div className="empty-state">
+                <div className="empty-icon">&#x1F999;</div>
+                <div className="empty-title">Start a conversation</div>
+                <div className="empty-sub">
+                  {showToolUi
+                    ? 'Tool calls will appear in the Approval Center before any command runs.'
+                    : 'OpenClaw responses stream directly from your selected agent.'}
+                </div>
+              </div>
+            )}
+
+            {messages.map((msg, idx) => {
+              if (showToolUi && msg.role === 'tool_call_ui') {
+                return (
+                  <div key={msg.id || idx} className="message-row message-tool">
+                    <ToolCallBubble msg={msg} />
+                  </div>
+                )
+              }
+              if (msg.role === 'tool_result') return null
+
+              const isUser = msg.role === 'user'
+              const isLast = idx === messages.length - 1
+              return (
+                <div key={msg.id || idx} className={`message-row ${isUser ? 'message-user' : 'message-assistant'}`}>
+                  <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'} ${msg.error ? 'bubble-error' : ''}`}>
+                    <div className="message-role">
+                      {isUser ? '&#x1F464; You' : '&#x1F999; Assistant'}
+                    </div>
+                    <div className="message-content">
+                      {renderMessageContent(msg.content)}
+                      {isLast && isStreaming && !isUser && (
+                        <span className="cursor-blink">&#x2587;</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          <div className="input-area">
+            <textarea
+              ref={inputRef}
+              className="chat-input"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={
+                !targetModel ? 'Select a model/agent to start chatting...' :
+                (showToolUi && isAwaitingApproval) ? 'Waiting for tool approval in Approval Center...' :
+                isStreaming ? 'Waiting for response...' :
+                'Type a message... (Enter to send, Shift+Enter for newline)'
+              }
+              disabled={isBusy || !targetModel}
+              rows={3}
+            />
+            <div className="input-actions">
+              {isBusy ? (
+                <button className="btn-danger" onClick={stopStreaming}>&#x23F9; Stop</button>
+              ) : (
+                <button
+                  className="btn-primary"
+                  onClick={sendMessage}
+                  disabled={!input.trim() || !targetModel}
+                >
+                  Send &#x27A4;
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Messages */}
-      <div className="messages">
-        {messages.length === 0 && (
-          <div className="empty-state">
-            <div className="empty-icon">🦙</div>
-            <div className="empty-title">Start a conversation</div>
-            <div className="empty-sub">
-              {showToolUi
-                ? 'Tool calls will appear in the Approval Center before any command runs.'
-                : 'OpenClaw responses stream directly from your selected agent.'}
-            </div>
+      {/* ── HISTORY TAB ── */}
+      {activeTab === 'history' && (
+        <div className="history-panel">
+          <div className="history-header">
+            <span className="history-header-title">&#x1F4CB; Chat History</span>
+            <button className="btn-primary btn-sm" onClick={startNewChat}>&#x2795; New Chat</button>
           </div>
-        )}
 
-        {messages.map((msg, idx) => {
-          if (showToolUi && msg.role === 'tool_call_ui') {
-            return (
-              <div key={msg.id || idx} className="message-row message-tool">
-                <ToolCallBubble msg={msg} />
-              </div>
-            )
-          }
-          if (msg.role === 'tool_result') {
-            return null // shown inline via tool_call_ui
-          }
-
-          const isUser = msg.role === 'user'
-          const isLast = idx === messages.length - 1
-          return (
-            <div key={msg.id || idx} className={`message-row ${isUser ? 'message-user' : 'message-assistant'}`}>
-              <div className={`message-bubble ${isUser ? 'bubble-user' : 'bubble-assistant'} ${msg.error ? 'bubble-error' : ''}`}>
-                <div className="message-role">
-                  {isUser ? '👤 You' : '🦙 Assistant'}
-                </div>
-                <div className="message-content">
-                  {renderMessageContent(msg.content)}
-                  {isLast && isStreaming && !isUser && (
-                    <span className="cursor-blink">▋</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      <div className="input-area">
-        <textarea
-          ref={inputRef}
-          className="chat-input"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            !targetModel ? 'Select a model/agent to start chatting…' :
-            (showToolUi && isAwaitingApproval) ? 'Waiting for tool approval in Approval Center…' :
-            isStreaming ? 'Waiting for response…' :
-            'Type a message… (Enter to send, Shift+Enter for newline)'
-          }
-          disabled={isBusy || !targetModel}
-          rows={3}
-        />
-        <div className="input-actions">
-          {isBusy ? (
-            <button className="btn-danger" onClick={stopStreaming}>⏹ Stop</button>
-          ) : (
-            <button
-              className="btn-primary"
-              onClick={sendMessage}
-              disabled={!input.trim() || !targetModel}
-            >
-              Send ➤
-            </button>
+          {!loaded && (
+            <div className="history-loading">Loading sessions&#x2026;</div>
           )}
+
+          {loaded && sessions.length === 0 && (
+            <div className="history-empty">
+              <div style={{ fontSize: 40, marginBottom: 12 }}>&#x1F4AC;</div>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>No chat history yet</div>
+              <div style={{ color: '#8b949e', fontSize: 14 }}>Your conversations will be saved here automatically.</div>
+            </div>
+          )}
+
+          {loaded && modelKeys.map(modelKey => (
+            <div key={modelKey} className="history-model-group">
+              <button
+                className="history-model-header"
+                onClick={() => toggleModelGroup(modelKey)}
+              >
+                <span className="history-model-icon">&#x1F916;</span>
+                <span className="history-model-name">{modelKey}</span>
+                <span className="history-model-count">{grouped[modelKey].length} chat{grouped[modelKey].length !== 1 ? 's' : ''}</span>
+                <span className="history-model-chevron">{expandedModels[modelKey] ? '&#x25B2;' : '&#x25BC;'}</span>
+              </button>
+
+              {expandedModels[modelKey] && (
+                <div className="history-session-list">
+                  {grouped[modelKey]
+                    .slice()
+                    .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    .map(session => {
+                      const msgCount = (session.messages || []).filter(m => m.role === 'user' || m.role === 'assistant').length
+                      return (
+                        <div
+                          key={session.id}
+                          className={`history-session-item ${session.id === sessionId ? 'history-session-active' : ''}`}
+                          onClick={() => loadSessionIntoChat(session)}
+                          title="Click to load this conversation"
+                        >
+                          <div className="history-session-title">{session.title || 'Untitled Chat'}</div>
+                          <div className="history-session-meta">
+                            <span className="history-session-date">{formatDate(session.updatedAt)}</span>
+                            <span className="history-session-msgs">{msgCount} message{msgCount !== 1 ? 's' : ''}</span>
+                          </div>
+                          <button
+                            className="history-session-delete"
+                            onClick={(e) => handleDeleteSession(e, session.id)}
+                            title="Delete this session"
+                          >
+                            &#x1F5D1;
+                          </button>
+                        </div>
+                      )
+                    })}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
     </div>
   )
 }

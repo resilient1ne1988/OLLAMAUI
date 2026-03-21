@@ -1743,3 +1743,250 @@ code {
   right: 6px;
 }
 
+
+/* ============================
+   Chat Page (tabs wrapper)
+   ============================ */
+.chat-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+/* ============================
+   Chat Tabs
+   ============================ */
+.chat-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px 0;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  flex-shrink: 0;
+}
+
+.chat-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #8b949e;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.chat-tab:hover {
+  color: #e6edf3;
+  background: #21262d;
+}
+
+.chat-tab-active {
+  color: #58a6ff;
+  border-bottom-color: #58a6ff;
+  background: #21262d;
+}
+
+.chat-tab-new-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #8b949e;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.chat-tab-new-btn:hover {
+  color: #58a6ff;
+  border-color: #58a6ff;
+}
+
+.history-badge {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  color: #8b949e;
+  font-size: 11px;
+  padding: 1px 6px;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* ============================
+   History Panel
+   ============================ */
+.history-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 0 24px;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 10px;
+  position: sticky;
+  top: 0;
+  background: #0d1117;
+  border-bottom: 1px solid #21262d;
+  z-index: 1;
+}
+
+.history-header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+}
+
+.history-loading,
+.history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #8b949e;
+  font-size: 15px;
+  text-align: center;
+}
+
+.history-model-group {
+  margin: 10px 12px 0;
+  border: 1px solid #21262d;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.history-model-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #161b22;
+  border: none;
+  cursor: pointer;
+  color: #e6edf3;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  transition: background 0.15s;
+}
+
+.history-model-header:hover {
+  background: #1c2128;
+}
+
+.history-model-icon {
+  font-size: 18px;
+}
+
+.history-model-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-model-count {
+  font-size: 12px;
+  color: #8b949e;
+  background: #21262d;
+  border-radius: 10px;
+  padding: 2px 8px;
+}
+
+.history-model-chevron {
+  font-size: 11px;
+  color: #8b949e;
+}
+
+.history-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.history-session-item {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  cursor: pointer;
+  border-top: 1px solid #21262d;
+  background: #0d1117;
+  position: relative;
+  transition: background 0.15s;
+}
+
+.history-session-item:hover {
+  background: #161b22;
+}
+
+.history-session-item:hover .history-session-delete {
+  opacity: 1;
+}
+
+.history-session-active {
+  background: #1c2850 !important;
+  border-left: 3px solid #58a6ff;
+}
+
+.history-session-title {
+  font-size: 14px;
+  color: #e6edf3;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 28px;
+  line-height: 1.4;
+}
+
+.history-session-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.history-session-date {
+  font-size: 12px;
+  color: #58a6ff;
+}
+
+.history-session-msgs {
+  font-size: 12px;
+  color: #8b949e;
+}
+
+.history-session-delete {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  font-size: 15px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.history-session-delete:hover {
+  color: #f85149;
+  background: #21262d;
+}
