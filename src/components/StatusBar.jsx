@@ -1,37 +1,20 @@
 import React from 'react'
 
-export default function StatusBar({ ollamaConnected, openclawConnected, selectedModel, activeStreams, appInfo }) {
+export default function StatusBar({ provider, selectedModel, selectedAgent, connected, openclawConnected, onlineMode }) {
+  const displayConnected = provider === 'ollama' ? connected : openclawConnected
+  const isElectron = typeof window !== 'undefined' && window.navigator.userAgent.includes('Electron')
   return (
     <footer className="status-bar">
-      <span className="status-item">
-        <span className={`status-dot ${ollamaConnected ? 'dot-green' : 'dot-red'}`}></span>
-        Ollama {ollamaConnected ? 'connected' : 'offline'}
+      <span className="status-bar-item">
+        {provider === 'ollama' ? '🦙 Ollama' : '🦅 OpenClaw'} · {provider === 'ollama' ? (selectedModel || 'No model selected') : (selectedAgent || 'No agent selected')}
       </span>
-      <span className="status-sep">|</span>
-      <span className="status-item">
-        <span className={`status-dot ${openclawConnected ? 'dot-green' : 'dot-red'}`}></span>
-        OpenClaw {openclawConnected ? 'connected' : 'offline'}
+      <span className="status-bar-sep">|</span>
+      <span className={`status-bar-item ${displayConnected === true ? 'status-ok' : 'status-err'}`}>
+        {displayConnected === true ? '● Connected' : displayConnected === false ? '● Disconnected' : '● Checking…'}
       </span>
-      {selectedModel && (
-        <>
-          <span className="status-sep">|</span>
-          <span className="status-item">Model: {selectedModel.replace(/:latest$/, '')}</span>
-        </>
-      )}
-      {activeStreams > 0 && (
-        <>
-          <span className="status-sep">|</span>
-          <span className="status-item status-streaming">⚡ {activeStreams} streaming</span>
-        </>
-      )}
-      {appInfo && (
-        <>
-          <span className="status-sep">|</span>
-          <span className="status-item">{appInfo.mode || 'browser'}</span>
-          <span className="status-sep">|</span>
-          <span className="status-item">v{appInfo.version || '2.0.0'}</span>
-        </>
-      )}
+      <span className="status-bar-sep">|</span>
+      <span className="status-bar-item">{isElectron ? '⚡ Electron' : '🌐 Browser'}</span>
+      {!onlineMode && <><span className="status-bar-sep">|</span><span className="status-bar-item status-warn">✈️ Offline Mode</span></>}
     </footer>
   )
 }

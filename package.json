@@ -1,15 +1,23 @@
 {
   "name": "ollamaui",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "BTCMACHINE — Local Ollama Chat UI desktop + browser",
   "main": "electron-main.js",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"vite\"",
+    "dev:server": "nodemon server/index.js",
     "server": "node server/index.js",
     "build": "vite build",
     "electron": "electron .",
     "electron:dev": "concurrently \"npm run server\" \"wait-on http://localhost:3838 && electron .\"",
-    "dist": "npm run build && electron-builder --win --x64"
+    "dist": "npm run build && electron-builder --win --x64",
+    "lint": "eslint src --ext .js,.jsx",
+    "lint:fix": "eslint src --ext .js,.jsx --fix",
+    "format": "prettier --write src",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepare": "husky"
   },
   "build": {
     "appId": "com.ollamaui.app",
@@ -40,19 +48,41 @@
     ]
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.0.0",
+    "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^4.1.0",
     "concurrently": "^8.0.0",
     "electron": "^30.0.0",
     "electron-builder": "^24.0.0",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "jsdom": "^29.0.1",
+    "lint-staged": "^16.4.0",
+    "nodemon": "^3.1.14",
+    "prettier": "^3.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^7.13.1",
     "vite": "^5.0.0",
+    "vitest": "^4.1.0",
     "wait-on": "^7.0.0"
   },
   "dependencies": {
+    "better-sqlite3": "^12.8.0",
     "cors": "^2.8.5",
     "express": "^4.18.0",
     "node-fetch": "^3.3.0"
+  },
+  "lint-staged": {
+    "src/**/*.{js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

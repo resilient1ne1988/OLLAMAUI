@@ -1,12 +1,7 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOllama } from '../context/OllamaContext'
-
-function formatSize(bytes) {
-  if (!bytes) return '?'
-  const gb = bytes / 1024 / 1024 / 1024
-  return gb >= 1 ? gb.toFixed(1) + ' GB' : (bytes / 1024 / 1024).toFixed(0) + ' MB'
-}
+import { formatSize, timeAgo } from '../utils/format'
 
 const SUGGESTED_MODELS = [
   { name: 'llama3.2', size: '~2GB', desc: 'Meta\'s Llama 3.2 — great all-rounder', tag: 'Popular' },

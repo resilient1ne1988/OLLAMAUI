@@ -1,57 +1,56 @@
-import { useState, useCallback } from 'react'
+﻿import { useState, useCallback } from 'react'
+import { useOllama } from '../context/OllamaContext'
 
 export function useModels(onToast) {
-  const [models, setModels] = useState([])
+  const { refreshModels } = useOllama()
   const [loading, setLoading] = useState(false)
   const [pullProgress, setPullProgress] = useState(null)
   const [pullStatus, setPullStatus] = useState('')
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await fetch('/api/models').then(r => r.json())
-      setModels(data.models || [])
-    } catch { setModels([]) }
-    finally { setLoading(false) }
-  }, [])
-
   const pull = useCallback(async (modelName) => {
+    setLoading(true)
     setPullProgress(0)
     setPullStatus('Starting...')
     try {
-      const res = await fetch('/api/pull', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: modelName, stream: true }) })
+      const res = await fetch('/api/pull', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: modelName, stream: true })
+      })
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
         const text = decoder.decode(value, { stream: true })
-        const lines = text.split('\n').filter(l => l.trim())
-        for (const line of lines) {
+        for (const line of text.split('\n').filter(l => l.trim())) {
           try {
             const data = JSON.parse(line)
             if (data.status) setPullStatus(data.status)
             if (data.completed && data.total) setPullProgress(Math.round((data.completed / data.total) * 100))
-            if (data.status === 'success') { onToast?.('success', `Model ${modelName} pulled successfully`); await refresh() }
+            if (data.status === 'success') {
+              onToast?.('success', `Model ${modelName} pulled successfully`)
+              await refreshModels()
+            }
           } catch {}
         }
       }
     } catch (e) { onToast?.('error', 'Pull failed: ' + e.message) }
-    finally { setPullProgress(null); setPullStatus('') }
-  }, [refresh, onToast])
+    finally { setLoading(false); setPullProgress(null); setPullStatus('') }
+  }, [refreshModels, onToast])
 
   const deleteModel = useCallback(async (name) => {
     try {
       await fetch('/api/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) })
       onToast?.('success', `Model ${name} deleted`)
-      await refresh()
+      await refreshModels()
     } catch (e) { onToast?.('error', 'Delete failed: ' + e.message) }
-  }, [refresh, onToast])
+  }, [refreshModels, onToast])
 
   const showDetails = useCallback(async (name) => {
     const data = await fetch('/api/show', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }).then(r => r.json())
     return data
   }, [])
 
-  return { models, loading, pull, deleteModel, showDetails, refresh, pullProgress, pullStatus }
+  return { loading, pull, deleteModel, showDetails, pullProgress, pullStatus }
 }

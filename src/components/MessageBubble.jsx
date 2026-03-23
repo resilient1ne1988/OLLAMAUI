@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, memo } from 'react'
 import CodeBlock from './CodeBlock'
 
 function parseContent(text) {
@@ -15,11 +15,11 @@ function parseContent(text) {
   return parts
 }
 
-export default function MessageBubble({ message, onCopy, onRegenerate }) {
+const MessageBubble = memo(function MessageBubble({ message, onCopy, onRegenerate }) {
   const [showActions, setShowActions] = useState(false)
   const isUser = message.role === 'user'
   const isAssistant = message.role === 'assistant'
-  const parts = parseContent(message.content)
+  const parts = useMemo(() => parseContent(message.content), [message.content])
 
   const copyMsg = async () => {
     await navigator.clipboard.writeText(message.content || '')
@@ -27,11 +27,8 @@ export default function MessageBubble({ message, onCopy, onRegenerate }) {
   }
 
   return (
-    <div
-      className={`message-bubble ${isUser ? 'msg-user' : isAssistant ? 'msg-assistant' : 'msg-tool'}`}
-      onMouseEnter={() => setShowActions(true)}
-      onMouseLeave={() => setShowActions(false)}
-    >
+    <div className={`message-bubble ${isUser ? 'msg-user' : isAssistant ? 'msg-assistant' : 'msg-tool'}`}
+      onMouseEnter={() => setShowActions(true)} onMouseLeave={() => setShowActions(false)}>
       <div className="msg-avatar">{isUser ? '👤' : isAssistant ? '🤖' : '🔧'}</div>
       <div className="msg-body">
         <div className="msg-content">
@@ -49,11 +46,11 @@ export default function MessageBubble({ message, onCopy, onRegenerate }) {
       {showActions && (
         <div className="msg-actions">
           <button className="btn-icon" onClick={copyMsg} title="Copy">📋</button>
-          {isAssistant && onRegenerate && (
-            <button className="btn-icon" onClick={onRegenerate} title="Regenerate">🔄</button>
-          )}
+          {isAssistant && onRegenerate && <button className="btn-icon" onClick={onRegenerate} title="Regenerate">🔄</button>}
         </div>
       )}
     </div>
   )
-}
+})
+
+export default MessageBubble

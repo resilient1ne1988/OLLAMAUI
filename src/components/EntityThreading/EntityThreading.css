@@ -1,0 +1,383 @@
+/* ─── Entity Panel ─────────────────────────────────────────────────────────── */
+.entity-panel {
+  width: 280px;
+  height: 100%;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  padding: 12px;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.entity-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.entity-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 0.75rem;
+  margin-left: 6px;
+}
+
+.entity-loading,
+.entity-empty {
+  color: var(--text);
+  opacity: 0.55;
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+
+.entity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ─── Entity Row ───────────────────────────────────────────────────────────── */
+.entity-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  font-size: 0.875rem;
+}
+
+.entity-row:hover {
+  background: var(--surface);
+}
+
+.entity-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Type Badge ───────────────────────────────────────────────────────────── */
+.entity-type-badge {
+  font-size: 0.7rem;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.type-person   { background: #dbeafe; color: #1d4ed8; }
+.type-product  { background: #ede9fe; color: #6d28d9; }
+.type-topic    { background: #ccfbf1; color: #0f766e; }
+.type-object   { background: #f3f4f6; color: #374151; }
+.type-other    { background: #f3f4f6; color: #374151; }
+
+/* ─── Pin Indicator ────────────────────────────────────────────────────────── */
+.pin-indicator {
+  color: #f59e0b;
+}
+
+/* ─── Drawer ───────────────────────────────────────────────────────────────── */
+.entity-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 300;
+}
+
+.entity-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100%;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+  z-index: 301;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  animation: slideInRight 0.2s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+
+.entity-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.entity-drawer-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.entity-drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.entity-drawer-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.entity-section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.entity-desc {
+  font-size: 0.875rem;
+  cursor: text;
+  padding: 4px;
+  border-radius: 4px;
+  min-height: 32px;
+}
+
+.entity-desc:hover,
+.entity-aliases:hover {
+  background: var(--surface);
+}
+
+.entity-placeholder {
+  opacity: 0.45;
+  font-style: italic;
+}
+
+.entity-aliases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  cursor: text;
+  padding: 4px;
+  border-radius: 4px;
+  min-height: 28px;
+}
+
+.alias-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+}
+
+.entity-ref-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.entity-ref-item {
+  font-size: 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entity-drawer-footer {
+  margin-top: auto;
+  padding: 14px 16px;
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Edit controls ────────────────────────────────────────────────────────── */
+.entity-edit-textarea {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.875rem;
+  padding: 6px 8px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.entity-edit-input,
+.entity-select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.875rem;
+  padding: 6px 8px;
+  font-family: inherit;
+}
+
+/* ─── Create Entity Dialog ─────────────────────────────────────────────────── */
+.create-entity-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.create-entity-dialog {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+}
+
+.create-entity-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.create-entity-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.create-entity-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.85rem;
+}
+
+.create-entity-field label {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.create-entity-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.entity-error {
+  color: #ef4444;
+  font-size: 0.82rem;
+}
+
+/* ─── Suggestion Chip ──────────────────────────────────────────────────────── */
+.entity-suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.entity-suggestion-chip:hover {
+  background: var(--border);
+}
+
+/* ─── Icon button ──────────────────────────────────────────────────────────── */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--text);
+  transition: background 0.15s;
+}
+
+.btn-icon:hover {
+  background: var(--surface);
+}
+
+/* ─── Danger button ────────────────────────────────────────────────────────── */
+.btn-danger {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+
+.btn-danger:hover {
+  background: #dc2626;
+}
+
+/* ─── Create Entity floating button ────────────────────────────────────────── */
+.create-entity-btn-float {
+  position: fixed;
+  z-index: 250;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  white-space: nowrap;
+  pointer-events: all;
+}
+
+.create-entity-btn-float:hover {
+  background: var(--surface);
+}

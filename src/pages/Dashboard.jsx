@@ -1,28 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react'
+﻿import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useOllama } from '../context/OllamaContext'
-
-function formatSize(bytes) {
-  if (!bytes) return '?'
-  const gb = bytes / 1024 / 1024 / 1024
-  if (gb >= 1) return gb.toFixed(1) + ' GB'
-  const mb = bytes / 1024 / 1024
-  return mb.toFixed(0) + ' MB'
-}
-
-function formatDate(dateStr) {
-  if (!dateStr) return '?'
-  try { return new Date(dateStr).toLocaleDateString() }
-  catch { return dateStr }
-}
-
-function timeAgo(ts) {
-  const diff = Date.now() - ts
-  if (diff < 60000) return 'just now'
-  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago'
-  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago'
-  return Math.floor(diff / 86400000) + 'd ago'
-}
+import { formatSize, formatDate, timeAgo } from '../utils/format'
 
 export default function Dashboard() {
   const navigate = useNavigate()

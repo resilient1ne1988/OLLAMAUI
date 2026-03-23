@@ -1,0 +1,226 @@
+/* ── Claim Ledger panel ─────────────────────────────────────────── */
+
+.claim-ledger {
+  width: 340px;
+  height: 100%;
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.claim-ledger-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.claim-ledger-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
+.claim-count-badge {
+  background: var(--border);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* ── Filter bar ─────────────────────────────────────────────────── */
+
+.filter-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s, color 0.15s;
+}
+
+.filter-btn.active {
+  background: var(--accent, #6366f1);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ── State feedback ─────────────────────────────────────────────── */
+
+.claim-loading,
+.claim-empty {
+  color: var(--text);
+  opacity: 0.5;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 24px 0;
+}
+
+/* ── Claim card ─────────────────────────────────────────────────── */
+
+.claim-card {
+  border-left: 4px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  cursor: default;
+}
+
+.claim-card.contradicted {
+  border-left-color: #ef4444;
+  opacity: 0.85;
+}
+
+.claim-card.unsupported {
+  border-left-color: #f59e0b;
+}
+
+.claim-card.supported {
+  border-left-color: #22c55e;
+}
+
+.claim-card.inferred {
+  border-left-color: #6b7280;
+}
+
+.claim-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.claim-text {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text);
+  flex: 1;
+}
+
+.claim-chevron {
+  font-size: 0.65rem;
+  color: var(--text);
+  opacity: 0.5;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* ── Badge row ──────────────────────────────────────────────────── */
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+/* ── Regenerate button ──────────────────────────────────────────── */
+
+.btn-regen {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  color: var(--text);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.btn-regen:hover {
+  opacity: 1;
+}
+
+/* ── Evidence drawer ────────────────────────────────────────────── */
+
+.evidence-drawer {
+  background: var(--surface-alt, #1e1e2e);
+  border-radius: 4px;
+  margin-top: 8px;
+  padding: 8px;
+}
+
+.evidence-empty {
+  font-size: 0.8rem;
+  color: var(--text);
+  opacity: 0.5;
+  margin: 0;
+}
+
+.evidence-ref-card {
+  font-size: 0.8rem;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.evidence-ref-card:last-child {
+  border-bottom: none;
+}
+
+.evidence-modality-icon {
+  font-size: 0.85rem;
+  margin-right: 4px;
+}
+
+.evidence-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.evidence-excerpt {
+  font-style: italic;
+  opacity: 0.75;
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.evidence-meta {
+  font-size: 0.72rem;
+  opacity: 0.55;
+}
+
+.contradiction-section {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+  border-left: 3px solid #ef4444;
+  font-size: 0.8rem;
+}
+
+.contradiction-ref {
+  border-bottom: none;
+  color: #ef4444;
+}
+
+.confidence-note {
+  font-size: 0.78rem;
+  opacity: 0.65;
+  margin: 6px 0 0;
+  color: var(--text);
+}

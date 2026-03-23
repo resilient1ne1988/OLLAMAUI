@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react'
+import { useShellHistory } from '../context/ShellHistoryContext'
 
 async function runShell(command) {
   try {
@@ -14,6 +15,7 @@ async function runShell(command) {
 }
 
 export default function Terminal() {
+  const { addEntry } = useShellHistory()
   const [terminalCmd, setTerminalCmd] = useState('')
   const [terminalOutput, setTerminalOutput] = useState([])
   const [terminalHistory, setTerminalHistory] = useState([])
@@ -32,6 +34,8 @@ export default function Terminal() {
     setTerminalOutput(prev => [...prev, { type: 'cmd', text: `PS> ${cmd}` }])
 
     const result = await runShell(cmd)
+
+    addEntry({ command: cmd, stdout: result.stdout, stderr: result.stderr, exitCode: result.exitCode, timestamp: Date.now() })
 
     if (result.stdout) setTerminalOutput(prev => [...prev, { type: 'stdout', text: result.stdout }])
     if (result.stderr) setTerminalOutput(prev => [...prev, { type: 'stderr', text: result.stderr }])

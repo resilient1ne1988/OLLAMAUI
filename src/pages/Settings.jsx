@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react'
+import { useSettings } from '../context/SettingsContext'
+import { useWorkspace } from '../context/WorkspaceContext'
+import WorkspaceMemorySettings from '../components/MemoryPolicy/WorkspaceMemorySettings'
 
 export default function Settings() {
-  const [settings, setSettings] = useState({
-    ollamaUrl: 'http://localhost:11434',
-    openclawUrl: 'http://localhost:18789',
-    openclawToken: '',
-    openclawPort: 18789,
-    defaultModel: '',
-    defaultPage: 'dashboard',
-    shellSafety: 'approval',
-    legacyShellTags: false,
-    mcpServerCommand: '',
-    mcpServerCwd: '',
-    mcpAutoStart: false,
-    dataDir: '',
-  })
+  const { settings: ctxSettings, saveSettings } = useSettings()
+  const { workspaces, activeWorkspaceId } = useWorkspace()
+  const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || null
+  const [settings, setSettings] = useState(ctxSettings)
   const [saved, setSaved] = useState(false)
+
+  useEffect(() => { setSettings(ctxSettings) }, [ctxSettings])
   const [appInfo, setAppInfo] = useState(null)
   const [testOllama, setTestOllama] = useState(null)
   const [testOllamaLoading, setTestOllamaLoading] = useState(false)
@@ -26,14 +21,13 @@ export default function Settings() {
   const [mcpLogs, setMcpLogs] = useState([])
 
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(d => setSettings(prev => ({ ...prev, ...d }))).catch(() => {})
     fetch('/api/app-info').then(r => r.json()).then(setAppInfo).catch(() => {})
     fetch('/api/mcp/status').then(r => r.json()).then(setMcpStatus).catch(() => {})
     fetch('/api/mcp/logs').then(r => r.json()).then(d => setMcpLogs(Array.isArray(d?.logs) ? d.logs : [])).catch(() => {})
   }, [])
 
   const save = async () => {
-    await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) })
+    await saveSettings(settings)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -306,6 +300,12 @@ export default function Settings() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Memory & Retention */}
+      <div className="settings-section">
+        <h2 className="settings-section-title">🧠 Memory &amp; Retention</h2>
+        <WorkspaceMemorySettings workspaceId={activeWorkspace?.id} />
       </div>
 
       {/* About */}

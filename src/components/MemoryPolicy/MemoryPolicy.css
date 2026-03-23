@@ -1,0 +1,146 @@
+.retention-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  user-select: none;
+}
+
+.retention-badge.expired {
+  background: #fee2e2;
+  color: #991b1b;
+  border-color: #ef4444;
+}
+
+.retention-badge.expiring-soon {
+  background: #fef3c7;
+  color: #92400e;
+  border-color: #f59e0b;
+}
+
+.retention-badge.session {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.retention-badge.manual {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.retention-badge.project {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.retention-badge.h24,
+.retention-badge.d7 {
+  background: var(--surface, #f3f4f6);
+  color: var(--text, #374151);
+  border-color: var(--border, #e5e7eb);
+}
+
+.retention-badge-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.memory-policy-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 1000;
+  min-width: 160px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.memory-policy-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: var(--text, #374151);
+  transition: background 0.1s;
+}
+
+.memory-policy-option:hover {
+  background: var(--bg, #f9fafb);
+}
+
+.memory-policy-option.active {
+  font-weight: 600;
+  background: var(--bg, #f3f4f6);
+}
+
+.memory-settings {
+  padding: 16px;
+}
+
+.memory-settings-section {
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.memory-settings-section:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.memory-settings-section h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+  color: var(--text, #111827);
+}
+
+.expiring-list {
+  font-size: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text, #374151);
+}
+
+.expiring-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.expiring-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-empty {
+  color: #6b7280;
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.cleanup-result {
+  margin-top: 8px;
+  font-size: 0.8rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}

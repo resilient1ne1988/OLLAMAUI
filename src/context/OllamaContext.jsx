@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { OLLAMA_POLL_INTERVAL_MS } from '../constants'
 
 const OllamaContext = createContext(null)
 
@@ -24,14 +25,34 @@ export function OllamaProvider({ children }) {
     }
   }, [])
 
+  const refreshModels = checkConnection
+
+  const intervalRef = useRef(null)
+
   useEffect(() => {
     checkConnection()
-    const interval = setInterval(checkConnection, 15000)
-    return () => clearInterval(interval)
+    intervalRef.current = setInterval(checkConnection, OLLAMA_POLL_INTERVAL_MS)
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      } else {
+        if (intervalRef.current) clearInterval(intervalRef.current)
+        checkConnection()
+        intervalRef.current = setInterval(checkConnection, OLLAMA_POLL_INTERVAL_MS)
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    return () => {
+      clearInterval(intervalRef.current)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
   }, [checkConnection])
 
   return (
-    <OllamaContext.Provider value={{ models, selectedModel, setSelectedModel, connected, checkConnection }}>
+    <OllamaContext.Provider value={{ models, selectedModel, setSelectedModel, connected, checkConnection, refreshModels }}>
       {children}
     </OllamaContext.Provider>
   )

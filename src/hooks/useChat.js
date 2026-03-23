@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from 'react'
+﻿import { useState, useRef, useCallback } from 'react'
 
-export function useChat({ provider, selectedModel, settings, onShellRequest }) {
+export function useChat({ provider, selectedModel, settings }) {
   const [messages, setMessages] = useState([])
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef(null)
@@ -12,13 +12,13 @@ export function useChat({ provider, selectedModel, settings, onShellRequest }) {
 
   const sendMessage = useCallback(async (content, params = {}) => {
     if (!content.trim() || isStreaming) return
-    const userMsg = { role: 'user', content, timestamp: Date.now() }
+    const userMsg = { id: crypto.randomUUID(), role: 'user', content, timestamp: Date.now() }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setIsStreaming(true)
     const controller = new AbortController()
     abortRef.current = controller
-    const assistantMsg = { role: 'assistant', content: '', timestamp: Date.now(), streaming: true }
+    const assistantMsg = { id: crypto.randomUUID(), role: 'assistant', content: '', timestamp: Date.now(), streaming: true }
     setMessages(prev => [...prev, assistantMsg])
     try {
       let fullContent = ''
@@ -84,11 +84,6 @@ export function useChat({ provider, selectedModel, settings, onShellRequest }) {
           }
         } catch {}
       }
-      // Check for shell commands
-      const shellMatch = fullContent.match(/<shell>([\s\S]*?)<\/shell>/i)
-      if (shellMatch && onShellRequest) {
-        onShellRequest(shellMatch[1].trim(), fullContent)
-      }
     } catch (e) {
       if (e.name !== 'AbortError') {
         setMessages(prev => {
@@ -106,7 +101,7 @@ export function useChat({ provider, selectedModel, settings, onShellRequest }) {
         return updated
       })
     }
-  }, [messages, isStreaming, provider, selectedModel, settings, onShellRequest])
+  }, [messages, isStreaming, provider, selectedModel, settings])
 
   const clearChat = useCallback(() => {
     stopStreaming()
