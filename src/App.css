@@ -2140,3 +2140,141 @@ code {
 .create-entity-btn-float:hover {
   background: #388bfd;
 }
+
+/* ============================
+   System Prompt Editor
+   ============================ */
+.system-prompt-editor {
+  flex-shrink: 0;
+  border-bottom: 1px solid #21262d;
+  background: #0d1117;
+}
+
+.system-prompt-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: #8b949e;
+  font-size: 12px;
+  font-family: 'Segoe UI', sans-serif;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.system-prompt-toggle:hover {
+  background: #161b22;
+  color: #e6edf3;
+}
+
+.spe-chevron {
+  font-size: 10px;
+  width: 12px;
+  display: inline-block;
+  color: #6e7681;
+}
+
+.spe-label {
+  font-weight: 500;
+  flex: 1;
+}
+
+.spe-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #388bfd;
+  flex-shrink: 0;
+}
+
+.system-prompt-body {
+  padding: 0 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: spe-open 0.15s ease;
+}
+
+@keyframes spe-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.system-prompt-textarea {
+  width: 100%;
+  background: #161b22;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: 'Segoe UI', monospace, sans-serif;
+  resize: vertical;
+  min-height: 80px;
+  max-height: 260px;
+  line-height: 1.5;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.system-prompt-textarea:focus {
+  outline: none;
+  border-color: #388bfd;
+  box-shadow: 0 0 0 2px rgba(56,139,253,0.15);
+}
+
+.system-prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spe-saved-label {
+  color: #3fb950;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 50px;
+}
+
+.spe-hint {
+  margin-left: auto;
+  color: #484f58;
+  font-size: 11px;
+}
+
+.btn-ghost {
+  background: none;
+  border: 1px solid #30363d;
+  color: #8b949e;
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-ghost:hover {
+  background: #21262d;
+  color: #e6edf3;
+  border-color: #6e7681;
+}
+
+.btn-ghost:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-danger-ghost {
+  color: #f85149;
+  border-color: #3d1f1f;
+}
+
+.btn-danger-ghost:hover {
+  background: #3d1f1f;
+  color: #ff7b72;
+  border-color: #f85149;
+}

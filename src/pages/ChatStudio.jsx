@@ -11,6 +11,7 @@ import MessageBubble from '../components/MessageBubble'
 import EntityPanel from '../components/EntityThreading/EntityPanel'
 import CreateEntityDialog from '../components/EntityThreading/CreateEntityDialog'
 import ClaimLedger from '../components/ClaimLedger/ClaimLedger'
+import SystemPromptEditor from '../components/SystemPromptEditor'
 
 
 export default function ChatStudio() {
@@ -23,6 +24,7 @@ export default function ChatStudio() {
   const [toastMsg, setToastMsg] = useState('')
   const [showClaimLedger, setShowClaimLedger] = useState(false)
   const [lastAssistantMessageId, setLastAssistantMessageId] = useState(null)
+  const [systemPrompt, setSystemPrompt] = useState('')
   const messagesEndRef = useRef(null)
   const prevIsStreamingRef = useRef(false)
 
@@ -37,6 +39,7 @@ export default function ChatStudio() {
     provider: 'ollama',
     selectedModel,
     settings,
+    systemPrompt,
     onToolCall: requestApproval,
   })
 
@@ -144,6 +147,7 @@ export default function ChatStudio() {
 
       <div className="chat-studio-body">
         <div className="chat-studio-main">
+          <SystemPromptEditor model={selectedModel} onPromptChange={setSystemPrompt} />
           <ConflictBanner workspaceId={activeWorkspaceId} messageId={lastAssistantMessageId} />
           <CaptureDirector workspaceId={activeWorkspaceId} messageText={input} onFollowSuggestion={() => {}} />
           <div className="chat-messages">
