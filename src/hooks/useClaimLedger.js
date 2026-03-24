@@ -9,6 +9,7 @@ export default function useClaimLedger(messageId) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [filterMode, setFilterMode] = useState('all')
+  const [regeneratingIds, setRegeneratingIds] = useState(new Set())
 
   // Fetch existing claims whenever messageId changes
   useEffect(() => {
@@ -26,6 +27,25 @@ export default function useClaimLedger(messageId) {
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
+  }, [messageId])
+
+  const regenerateClaim = useCallback(async (claimId) => {
+    if (!messageId) return
+    setRegeneratingIds(prev => new Set([...prev, claimId]))
+    try {
+      const r = await fetch(`/api/messages/${messageId}/claims/segment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimId }),
+      })
+      const d = await r.json()
+      if (d.ok) setClaims(d.data)
+      else setError(d.error)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setRegeneratingIds(prev => { const s = new Set(prev); s.delete(claimId); return s })
+    }
   }, [messageId])
 
   /**
@@ -61,5 +81,5 @@ export default function useClaimLedger(messageId) {
     return true
   })
 
-  return { claims, loading, error, segmentClaims, filterMode, setFilterMode, filteredClaims }
+  return { claims, loading, error, segmentClaims, regenerateClaim, regeneratingIds, filterMode, setFilterMode, filteredClaims }
 }

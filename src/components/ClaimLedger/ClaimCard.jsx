@@ -17,7 +17,7 @@ function getPrimaryClass(supportTypes = []) {
   return 'inferred'
 }
 
-export default function ClaimCard({ claim, onRegenerate }) {
+export default function ClaimCard({ claim, onRegenerate, regenerating }) {
   const [expanded, setExpanded] = useState(false)
 
   const borderClass = getPrimaryClass(claim.supportTypes)
@@ -43,8 +43,9 @@ export default function ClaimCard({ claim, onRegenerate }) {
           className="btn-regen"
           onClick={e => { e.stopPropagation(); onRegenerate && onRegenerate(claim.id) }}
           title="Re-generate this claim"
+          disabled={regenerating}
         >
-          ↻ Regenerate
+          {regenerating ? '⏳ Regenerating…' : '↻ Regenerate'}
         </button>
       )}
     </div>

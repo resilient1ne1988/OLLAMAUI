@@ -3,13 +3,15 @@ import useClaimLedger from '../../hooks/useClaimLedger'
 import ClaimCard from './ClaimCard'
 import './ClaimLedger.css'
 
-export default function ClaimLedger({ messageId, onRegenerate }) {
+export default function ClaimLedger({ messageId }) {
   const {
     claims,
     loading,
     filteredClaims,
     filterMode,
     setFilterMode,
+    regenerateClaim,
+    regeneratingIds,
   } = useClaimLedger(messageId)
 
   const allCount = claims.length
@@ -64,7 +66,8 @@ export default function ClaimLedger({ messageId, onRegenerate }) {
         <ClaimCard
           key={claim.id}
           claim={claim}
-          onRegenerate={onRegenerate}
+          onRegenerate={regenerateClaim}
+          regenerating={regeneratingIds.has(claim.id)}
         />
       ))}
     </div>

@@ -1,0 +1,56 @@
+.inspection-panel {
+  display: flex;
+  flex-direction: column;
+  background: #1a1a2e;
+  border-left: 1px solid #21262d;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.inspection-tab-bar {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid #21262d;
+  background: #161625;
+}
+
+.inspection-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #8b949e;
+  padding: 8px 4px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.inspection-tab-btn:hover {
+  color: #c9d1d9;
+}
+
+.inspection-tab-btn.active {
+  color: #58a6ff;
+  border-bottom-color: #58a6ff;
+}
+
+.inspection-tab-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.inspection-memory-msg {
+  padding: 24px 16px;
+  color: #8b949e;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.inspection-memory-msg h3 {
+  color: #c9d1d9;
+  margin: 0 0 8px 0;
+  font-size: 14px;
+}

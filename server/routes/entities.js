@@ -51,6 +51,16 @@ router.post('/suggest', (req, res) => {
   } catch (e) { err(res, e); }
 });
 
+// POST /api/entities/:workspaceId/extract
+router.post('/:workspaceId/extract', (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) return err(res, new Error('text required'), 400);
+    const entities = svc.extractEntitiesFromText(text);
+    res.json({ entities });
+  } catch (e) { err(res, e); }
+});
+
 // POST /api/entities/:entityId/claims/:claimId
 router.post('/:entityId/claims/:claimId', (req, res) => {
   try { svc.addClaimToEntity(req.params.entityId, req.params.claimId); ok(res, null); }

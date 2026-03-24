@@ -8,10 +8,12 @@ import { useWorkspace } from '../context/WorkspaceContext'
 import ConflictBanner from '../components/ConflictCenter/ConflictBanner'
 import CaptureDirector from '../components/CaptureDirector/CaptureDirector'
 import MessageBubble from '../components/MessageBubble'
-import EntityPanel from '../components/EntityThreading/EntityPanel'
 import CreateEntityDialog from '../components/EntityThreading/CreateEntityDialog'
-import ClaimLedger from '../components/ClaimLedger/ClaimLedger'
+import EntitySuggestionChip from '../components/EntityThreading/EntitySuggestionChip'
+import { useAutoNer } from '../hooks/useAutoNer'
 import SystemPromptEditor from '../components/SystemPromptEditor'
+import InspectionPanel from '../components/InspectionPanel/InspectionPanel'
+import WorkspacePanel from '../components/WorkspacePanel/WorkspacePanel'
 
 
 export default function ChatStudio() {
@@ -22,13 +24,14 @@ export default function ChatStudio() {
   const { activeWorkspaceId } = useWorkspace()
   const [input, setInput] = useState('')
   const [toastMsg, setToastMsg] = useState('')
-  const [showClaimLedger, setShowClaimLedger] = useState(false)
   const [lastAssistantMessageId, setLastAssistantMessageId] = useState(null)
+  const [inspectionTab, setInspectionTab] = useState('claims')
   const [systemPrompt, setSystemPrompt] = useState('')
   const messagesEndRef = useRef(null)
   const prevIsStreamingRef = useRef(false)
 
-  const [showEntityPanel, setShowEntityPanel] = useState(false)
+  const { suggestions: nerSuggestions, extractFromText, dismiss: dismissNer } = useAutoNer(activeWorkspaceId)
+
   const [selectedText, setSelectedText] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [floatPos, setFloatPos] = useState(null)
@@ -61,7 +64,8 @@ export default function ChatStudio() {
         })
           .then(r => r.json())
           .catch(() => ({}))
-          .finally(() => setLastAssistantMessageId(msgId))
+          .finally(() => { setLastAssistantMessageId(msgId); setInspectionTab('claims') })
+        extractFromText(text)
       }
     }
   }, [isStreaming, messages])
@@ -107,9 +111,7 @@ export default function ChatStudio() {
     setLastAssistantMessageId(null)
   }
 
-  const handleRegenerate = useCallback((claimId) => {
-    showToast(`↻ Regenerating claim ${claimId.slice(0, 8)}…`)
-  }, [])
+  const handleRegenerate = useCallback(() => {}, [])
 
   const handleEntityCreated = useCallback((entity) => {
     setShowCreateDialog(false)
@@ -126,16 +128,6 @@ export default function ChatStudio() {
       <div className="page-header">
         <h1 className="page-title">💬 Chat Studio</h1>
         <div className="page-actions">
-          <button
-            className={`btn-secondary btn-sm${showEntityPanel ? ' active' : ''}`}
-            onClick={() => setShowEntityPanel(v => !v)}
-            title="Toggle Entities Panel"
-          >🧵 Entities</button>
-          <button
-            className={`btn-secondary btn-sm${showClaimLedger ? ' active' : ''}`}
-            onClick={() => setShowClaimLedger(v => !v)}
-            title="Toggle Claim Ledger"
-          >🔍 Claims</button>
           <button disabled={messages.length === 0} className="btn-secondary btn-sm" onClick={handleSave}>💾 Save</button>
           <button className="btn-secondary btn-sm" onClick={handleNewChat}>🆕 New Chat</button>
         </div>
@@ -146,6 +138,7 @@ export default function ChatStudio() {
       )}
 
       <div className="chat-studio-body">
+        <WorkspacePanel onOpenEntities={() => setInspectionTab('entities')} />
         <div className="chat-studio-main">
           <SystemPromptEditor model={selectedModel} onPromptChange={setSystemPrompt} />
           <ConflictBanner workspaceId={activeWorkspaceId} messageId={lastAssistantMessageId} />
@@ -160,6 +153,17 @@ export default function ChatStudio() {
             {messages.map((msg, i) => (
               <MessageBubble key={i} message={msg} onCopy={() => showToast('Copied!')} />
             ))}
+            {nerSuggestions.length > 0 && (
+              <div className="ner-suggestions-row">
+                {nerSuggestions.map(s => (
+                  <EntitySuggestionChip
+                    key={s.text}
+                    entity={{ name: s.text, entityType: s.type }}
+                    onOpen={() => { setSelectedText(s.text); setShowCreateDialog(true); dismissNer(s.text) }}
+                  />
+                ))}
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -182,19 +186,14 @@ export default function ChatStudio() {
           </div>
         </div>
 
-        {showEntityPanel && (
-          <EntityPanel
-            workspaceId={activeWorkspaceId}
-            onAskFollowUp={handleAskFollowUp}
-          />
-        )}
-
-        {showClaimLedger && lastAssistantMessageId && (
-          <ClaimLedger
-            messageId={lastAssistantMessageId}
-            onRegenerate={handleRegenerate}
-          />
-        )}
+        <InspectionPanel
+          activeTab={inspectionTab}
+          onTabChange={setInspectionTab}
+          messageId={lastAssistantMessageId}
+          workspaceId={activeWorkspaceId}
+          onAskFollowUp={handleAskFollowUp}
+          onRegenerate={handleRegenerate}
+        />
       </div>
 
       {toastMsg && <div className="toast">{toastMsg}</div>}

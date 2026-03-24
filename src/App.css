@@ -289,12 +289,135 @@ body {
 }
 
 .message-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  position: relative;
+  word-break: break-word;
+}
+
+.msg-user {
+  flex-direction: row-reverse;
+}
+
+.msg-avatar {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  padding-top: 2px;
+  user-select: none;
+}
+
+.msg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   max-width: min(72%, 820px);
+}
+
+.msg-user .msg-body {
+  align-items: flex-end;
+}
+
+.msg-content {
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 14px;
-  line-height: 1.6;
-  word-break: break-word;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.msg-user .msg-content {
+  background: #1c2d4a;
+  border: 1px solid #1f3966;
+  color: #cae3ff;
+}
+
+.msg-assistant .msg-content {
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+}
+
+.msg-tool .msg-content {
+  background: #0f1f1a;
+  border: 1px solid #1a3d30;
+  color: #56d364;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 13px;
+  max-width: min(90%, 900px);
+}
+
+.msg-text {
+  display: inline;
+}
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.msg-time {
+  font-size: 11px;
+  color: #484f58;
+}
+
+.msg-error-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: #f85149;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(248,81,73,0.12);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.msg-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.7;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+.btn-icon:hover {
+  opacity: 1;
+  background: #30363d;
+}
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  animation: blink-cursor 0.8s step-end infinite;
+  color: #388bfd;
+  font-size: 16px;
+  line-height: 1;
+  vertical-align: text-bottom;
+  margin-left: 2px;
 }
 
 .bubble-user {
@@ -2011,18 +2134,21 @@ code {
 }
 
 .chat-studio-body {
-  display: flex;
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+  gap: 0;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
 .chat-studio-main {
-  flex: 1;
+  grid-column: 2 / 3;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .chat-messages {

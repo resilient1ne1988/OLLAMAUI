@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { useSettings } from './SettingsContext'
 
 const OpenClawContext = createContext(null)
 
 export function OpenClawProvider({ children }) {
+  const { settings } = useSettings()
   const [agents, setAgents] = useState([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [provider, setProvider] = useState('ollama')
@@ -35,6 +37,11 @@ export function OpenClawProvider({ children }) {
 
     checkOpenClaw()
   }, [checkOpenClaw])
+
+  // Re-check OpenClaw health when port setting changes
+  useEffect(() => {
+    if (settings.openclawPort) checkOpenClaw()
+  }, [settings.openclawPort, checkOpenClaw])
 
   return (
     <OpenClawContext.Provider value={{

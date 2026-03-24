@@ -33,10 +33,9 @@ export default function useConflictDetector(workspaceId) {
     finally { setLoading(false) }
   }, [workspaceId])
 
-  const resolveConflict = useCallback(async (conflictId, action, authoritativeSourceRefId) => {
+  const resolveConflict = useCallback(async (conflictId, authoritativeSourceRefId) => {
     try {
-      const body = {}
-      if (authoritativeSourceRefId) body.authoritativeSourceRefId = authoritativeSourceRefId
+      const body = { authoritativeSourceRefId }
       const res = await fetch(`/api/conflicts/${conflictId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { OLLAMA_POLL_INTERVAL_MS } from '../constants'
+import { useSettings } from './SettingsContext'
 
 const OllamaContext = createContext(null)
 
 export function OllamaProvider({ children }) {
+  const { settings } = useSettings()
   const [models, setModels] = useState([])
   const [selectedModel, setSelectedModel] = useState('')
   const [connected, setConnected] = useState(null) // null=checking, true, false
@@ -28,6 +30,11 @@ export function OllamaProvider({ children }) {
   const refreshModels = checkConnection
 
   const intervalRef = useRef(null)
+
+  // Re-check connection when ollamaUrl setting changes
+  useEffect(() => {
+    if (settings.ollamaUrl) checkConnection()
+  }, [settings.ollamaUrl, checkConnection])
 
   useEffect(() => {
     checkConnection()

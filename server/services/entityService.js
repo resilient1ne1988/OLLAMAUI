@@ -88,4 +88,30 @@ function addClaimToEntity(entityId, claimId) {
   }
 }
 
-module.exports = { createEntity, getEntitiesForWorkspace, getEntity, updateEntity, deleteEntity, suggestEntityLinks, addClaimToEntity };
+function extractEntitiesFromText(text) {
+  const results = [];
+  const seen = new Set();
+
+  const add = (matchText, type) => {
+    const t = matchText.trim();
+    if (!t || seen.has(t)) return;
+    seen.add(t);
+    results.push({ text: t, type });
+  };
+
+  const capPhrases = text.match(/\b([A-Z][a-z]+ )+[A-Z][a-z]+\b/g) || [];
+  capPhrases.forEach(m => add(m, 'person_or_org'));
+
+  const amounts = text.match(/\$[\d,]+(\.\d{2})?/g) || [];
+  amounts.forEach(m => add(m, 'amount'));
+
+  const dates = text.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\b|\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4}\b/gi) || [];
+  dates.forEach(m => add(m, 'date'));
+
+  const acronyms = text.match(/\b[A-Z]{2,6}\b/g) || [];
+  acronyms.forEach(m => add(m, 'acronym'));
+
+  return results.slice(0, 10);
+}
+
+module.exports = { createEntity, getEntitiesForWorkspace, getEntity, updateEntity, deleteEntity, suggestEntityLinks, addClaimToEntity, extractEntitiesFromText };

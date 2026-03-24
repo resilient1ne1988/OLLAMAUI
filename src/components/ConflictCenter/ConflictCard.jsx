@@ -40,14 +40,11 @@ export default function ConflictCard({ conflict, onResolve }) {
       <div className="conflict-explanation">{conflict.explanation}</div>
 
       <div className="conflict-actions">
-        <button className="btn-secondary btn-sm" onClick={() => onResolve(conflict.id, 'cautious')}>
-          💬 Answer cautiously
+        <button className="btn-secondary btn-sm" onClick={() => onResolve(conflict.id, conflict.sourceRefA)}>
+          ✅ Trust Source A
         </button>
-        <button className="btn-secondary btn-sm" onClick={() => onResolve(conflict.id, 'auth_a', conflict.sourceRefA)}>
-          ✅ A is authoritative
-        </button>
-        <button className="btn-secondary btn-sm" onClick={() => onResolve(conflict.id, 'auth_b', conflict.sourceRefB)}>
-          ✅ B is authoritative
+        <button className="btn-secondary btn-sm" onClick={() => onResolve(conflict.id, conflict.sourceRefB)}>
+          ✅ Trust Source B
         </button>
       </div>
     </div>
